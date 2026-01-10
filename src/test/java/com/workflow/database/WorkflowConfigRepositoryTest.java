@@ -43,7 +43,9 @@ class WorkflowConfigRepositoryTest {
               + "id INT PRIMARY KEY AUTO_INCREMENT,"
               + "name VARCHAR(255) NOT NULL UNIQUE,"
               + "description VARCHAR(255),"
-              + "is_parallel BOOLEAN DEFAULT FALSE"
+              + "is_parallel BOOLEAN DEFAULT FALSE,"
+              + "fail_fast BOOLEAN DEFAULT FALSE,"
+              + "share_context BOOLEAN DEFAULT TRUE"
               + ")");
 
       stmt.execute(

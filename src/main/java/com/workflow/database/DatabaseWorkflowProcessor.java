@@ -26,7 +26,9 @@ import lombok.extern.slf4j.Slf4j;
  *   id INT PRIMARY KEY AUTO_INCREMENT,
  *   name VARCHAR(255) NOT NULL UNIQUE,
  *   description VARCHAR(255),
- *   is_parallel BOOLEAN DEFAULT FALSE
+ *   is_parallel BOOLEAN DEFAULT FALSE,
+ *   fail_fast BOOLEAN DEFAULT FALSE,
+ *   share_context BOOLEAN DEFAULT TRUE
  * );
  *
  * CREATE TABLE workflow_steps (
@@ -162,8 +164,17 @@ public class DatabaseWorkflowProcessor {
   private Workflow buildCompositeWorkflow(
       String workflowName, WorkflowMetadata metadata, List<Workflow> workflows) {
     if (metadata.isParallel()) {
-      log.debug("Creating parallel workflow: {}", workflowName);
-      return ParallelWorkflow.builder().name(workflowName).workflows(workflows).build();
+      log.debug(
+          "Creating parallel workflow: {} (failFast={}, shareContext={})",
+          workflowName,
+          metadata.failFast(),
+          metadata.shareContext());
+      return ParallelWorkflow.builder()
+          .name(workflowName)
+          .workflows(workflows)
+          .failFast(metadata.failFast())
+          .shareContext(metadata.shareContext())
+          .build();
     } else {
       log.debug("Creating sequential workflow: {}", workflowName);
       return SequentialWorkflow.builder().name(workflowName).workflows(workflows).build();

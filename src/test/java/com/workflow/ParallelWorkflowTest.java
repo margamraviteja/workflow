@@ -522,4 +522,85 @@ class ParallelWorkflowTest {
         ParallelWorkflow.builder().executionStrategy(null);
     assertThrows(NullPointerException.class, builder::build);
   }
+
+  @Test
+  void builder_withFailFastTrue_shouldConfigureFailFast() {
+    Workflow w1 = WorkflowTestUtils.mockSuccessfulWorkflow("w1");
+    Workflow w2 = WorkflowTestUtils.mockSuccessfulWorkflow("w2");
+
+    ParallelWorkflow wf =
+        ParallelWorkflow.builder()
+            .name("fail-fast-enabled")
+            .workflow(w1)
+            .workflow(w2)
+            .failFast(true)
+            .executionStrategy(immediateStrategy())
+            .build();
+
+    RuntimeException error = new RuntimeException("failure");
+    CompletableFuture<Void> failedFuture = new CompletableFuture<>();
+    failedFuture.completeExceptionally(error);
+
+    try (MockedStatic<FutureUtils> fu = Mockito.mockStatic(FutureUtils.class)) {
+      fu.when(() -> FutureUtils.allOf(anyList(), eq(true))).thenReturn(failedFuture);
+
+      WorkflowResult result = wf.execute(WorkflowTestUtils.createContext());
+
+      WorkflowTestUtils.assertFailed(result);
+      assertNotNull(result.getError());
+    }
+  }
+
+  @Test
+  void builder_withShareContextFalse_shouldIsolateContexts() {
+    WorkflowContext original = mock(WorkflowContext.class);
+    WorkflowContext copy1 = mock(WorkflowContext.class);
+
+    when(original.copy()).thenReturn(copy1);
+    when(original.getListeners()).thenReturn(new WorkflowListeners());
+
+    Workflow w1 = WorkflowTestUtils.mockSuccessfulWorkflow("w1");
+
+    ParallelWorkflow wf =
+        ParallelWorkflow.builder()
+            .name("isolated-context")
+            .workflow(w1)
+            .shareContext(false)
+            .executionStrategy(immediateStrategy())
+            .build();
+
+    try (MockedStatic<FutureUtils> fu = Mockito.mockStatic(FutureUtils.class)) {
+      fu.when(() -> FutureUtils.allOf(anyList(), anyBoolean()))
+          .thenReturn(CompletableFuture.completedFuture(null));
+
+      wf.execute(original);
+
+      verify(original).copy();
+    }
+  }
+
+  @Test
+  void builder_withShareContextTrue_shouldShareContext() {
+    WorkflowContext original = mock(WorkflowContext.class);
+    when(original.getListeners()).thenReturn(new WorkflowListeners());
+
+    Workflow w1 = WorkflowTestUtils.mockSuccessfulWorkflow("w1");
+
+    ParallelWorkflow wf =
+        ParallelWorkflow.builder()
+            .name("shared-context")
+            .workflow(w1)
+            .shareContext(true)
+            .executionStrategy(immediateStrategy())
+            .build();
+
+    try (MockedStatic<FutureUtils> fu = Mockito.mockStatic(FutureUtils.class)) {
+      fu.when(() -> FutureUtils.allOf(anyList(), anyBoolean()))
+          .thenReturn(CompletableFuture.completedFuture(null));
+
+      wf.execute(original);
+
+      verify(original, never()).copy();
+    }
+  }
 }

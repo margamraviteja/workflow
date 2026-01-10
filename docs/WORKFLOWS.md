@@ -11,6 +11,7 @@
 - [Task Workflow](#task-workflow)
 - [Rate Limited Workflow](#rate-limited-workflow)
 - [Timeout Workflow](#timeout-workflow)
+- [JavaScript Workflow](#javascript-workflow)
 - [Workflow Composition](#workflow-composition)
 - [Best Practices](#best-practices)
 
@@ -44,7 +45,7 @@ public class WorkflowResult {
 
 ## Workflow Types
 
-The framework provides eight core workflow types:
+The framework provides nine core workflow types:
 
 | Workflow              | Purpose              | Execution           | Use Case                  |
 |-----------------------|----------------------|---------------------|---------------------------|
@@ -56,6 +57,7 @@ The framework provides eight core workflow types:
 | **Task**              | Single task wrapper  | Task execution      | Wrap tasks as workflows   |
 | **Rate Limited**      | Throttled execution  | Rate controlled     | API rate limits           |
 | **Timeout**           | Time-bounded         | With timeout        | Time constraints          |
+| **Javascript**        | Dynamic JS execution | Script-based logic  | Dynamic business rules    |
 
 ## Sequential Workflow
 
@@ -1078,6 +1080,791 @@ Workflow pipeline = SequentialWorkflow.builder()
 - `TaskDescriptor.timeoutPolicy`: Applies to individual task execution
 - Both can be used together for fine-grained control
 
+## JavaScript Workflow
+
+Executes dynamic JavaScript logic using the GraalVM Polyglot API. This workflow type enables you to implement business logic that can be modified at runtime without recompiling or redeploying your application.
+
+### Features
+
+- **Dynamic Execution**: JavaScript code loaded and executed at runtime
+- **High Performance**: Uses shared GraalVM engine with JIT compilation and AST caching
+- **Secure Sandbox**: Scripts execute in a restricted environment with disabled host class lookup
+- **Flexible Script Sources**: Load scripts from files, databases, URLs, or inline strings via `ScriptProvider`
+- **Context Integration**: Full bidirectional access to `WorkflowContext`
+- **Type Conversion**: Automatic conversion between JavaScript and Java types via `PolyglotMapper`
+- **ECMAScript 2021**: Full ES2021 support including modern JavaScript features
+- **ESM Module Support**: Full support for ES6 modules with import/export syntax
+- **Module Resolution**: Relative and absolute module imports with proper URI-based resolution
+
+### Builder API
+
+```
+JavascriptWorkflow.builder()
+    .name(String)                       // Optional workflow name
+    .scriptProvider(ScriptProvider)     // Required: provides script content
+    .build()
+```
+
+### ScriptProvider Interface
+
+Script content is provided through the `ScriptProvider` interface:
+
+```java
+public interface ScriptProvider {
+    record ScriptSource(String content, URI uri) {}
+    ScriptSource loadScript() throws ScriptLoadException;
+}
+```
+
+The `ScriptSource` record contains:
+- **content**: The JavaScript code to execute
+- **uri**: Optional URI for module resolution (required for ESM imports)
+
+**Built-in Providers:**
+- `InlineScriptProvider`: Inline script with optional base URI
+- `FileScriptProvider`: Load from filesystem (provides file URI automatically)
+- `ClasspathScriptProvider`: Load from classpath resources (provides resource URI)
+- Custom implementations: Database, HTTP, etc.
+
+### Basic Example
+
+```java
+public void example() {
+   // Inline script provider
+    ScriptProvider provider = new InlineScriptProvider(
+            """
+            var total = ctx.get('price') * ctx.get('quantity');
+            ctx.put('total', total);
+            """);
+
+    JavascriptWorkflow workflow = JavascriptWorkflow.builder()
+            .name("CalculateTotal")
+            .scriptProvider(provider)
+            .build();
+
+    WorkflowContext context = new WorkflowContext();
+    context.put("price", 100.0);
+    context.put("quantity", 5);
+
+    WorkflowResult result = workflow.execute(context);
+    Double total = context.getTyped("total", Double.class);  // 500.0
+}
+```
+
+### Context Access
+
+JavaScript code accesses the workflow context through a global `ctx` object (proxy to `WorkflowContext`):
+
+```javascript
+// Get values from context
+const value = ctx.get('key');
+
+// Put values into context (automatically converted from JS to Java)
+ctx.put('result', { name: 'John', age: 30 });
+ctx.put('numbers', [1, 2, 3, 4, 5]);
+ctx.put('computed', someValue * 2);
+```
+
+**Type Conversion:**
+- JavaScript objects → Java `Map<String, Object>`
+- JavaScript arrays → Java `List<Object>`  
+- JavaScript primitives → Java primitives
+- Nested structures are recursively converted
+- Conversion ensures data remains accessible after script execution
+
+### File-Based Script
+
+```java
+// Load script from file
+Path scriptPath = Path.of("scripts/discount.js");
+FileScriptProvider provider = new FileScriptProvider(scriptPath);
+
+JavascriptWorkflow workflow = JavascriptWorkflow.builder()
+    .name("ApplyDiscount")
+    .scriptProvider(provider)
+    .build();
+
+// Content of scripts/discount.js:
+// var amount = context.get("orderTotal");
+// if (amount > 1000) {
+//     context.put("discountCode", "VIP_PROMO");
+//     context.put("discountPercent", 15);
+// } else if (amount > 500) {
+//     context.put("discountCode", "REGULAR_PROMO");
+//     context.put("discountPercent", 10);
+// }
+```
+
+### Real-World Examples
+
+#### Dynamic Pricing Rules
+
+```java
+// Pricing rules that can be updated without deployment
+ScriptProvider pricingRules = new FileScriptProvider(
+    Path.of("rules/pricing.js")
+);
+
+JavascriptWorkflow pricingWorkflow = JavascriptWorkflow.builder()
+    .name("DynamicPricing")
+    .scriptProvider(pricingRules)
+    .build();
+
+// rules/pricing.js:
+// var basePrice = context.get('basePrice');
+// var customer = context.get('customer');
+// var season = context.get('season');
+//
+// var multiplier = 1.0;
+// if (customer.tier === 'PREMIUM') multiplier *= 0.9;
+// if (season === 'HOLIDAY') multiplier *= 1.2;
+//
+// context.put('finalPrice', Math.round(basePrice * multiplier * 100) / 100);
+```
+
+#### Order Risk Scoring
+
+```java
+public void example() {
+    // Complex risk assessment logic in JavaScript
+    ScriptProvider riskEngine = () -> """
+            var order = JSON.parse(context.get('orderJson'));
+            var riskScore = 0;
+            
+            // High value orders
+            if (order.total > 5000) riskScore += 10;
+            
+            // International shipping
+            if (order.shipping.country !== 'US') riskScore += 5;
+            
+            // New customer
+            if (order.customer.yearsActive < 1) riskScore += 15;
+            
+            // Multiple payment attempts
+            if (order.paymentAttempts > 1) riskScore += 20;
+            
+            var action = riskScore > 20 ? 'MANUAL_REVIEW' : 'AUTO_APPROVE';
+            
+            context.put('riskScore', riskScore);
+            context.put('action', action);
+            context.put('reasons', getRiskReasons(order, riskScore));
+            
+            function getRiskReasons(order, score) {
+                var reasons = [];
+                if (order.total > 5000) reasons.push('High value order');
+                if (order.shipping.country !== 'US') reasons.push('International shipping');
+                if (order.customer.yearsActive < 1) reasons.push('New customer');
+                return reasons;
+            }
+            """;
+
+    JavascriptWorkflow riskWorkflow = JavascriptWorkflow.builder()
+            .name("OrderRiskAssessment")
+            .scriptProvider(riskEngine)
+            .build();
+
+    context.put("orderJson", orderJsonString);
+    riskWorkflow.execute(context);
+
+    Integer riskScore = context.getTyped("riskScore", Integer.class);
+    String action = context.getTyped("action", String.class);
+}
+```
+
+#### Data Transformation and Filtering
+
+```java
+// Transform and filter complex data structures
+ScriptProvider dataTransform = () -> """
+    var apiResponse = JSON.parse(context.get('apiResponse'));
+    
+    // Filter active users
+    var activeUsers = apiResponse.users.filter(u => u.status === 'ACTIVE');
+    
+    // Transform to simplified format
+    var transformed = activeUsers.map(user => ({
+        id: user.userId,
+        name: user.profile.fullName,
+        email: user.contact.primaryEmail,
+        permissions: user.roles.flatMap(r => r.permissions)
+    }));
+    
+    // Calculate statistics
+    var stats = {
+        totalUsers: apiResponse.users.length,
+        activeUsers: activeUsers.length,
+        inactiveUsers: apiResponse.users.length - activeUsers.length,
+        avgPermissions: transformed.reduce((sum, u) =>
+            sum + u.permissions.length, 0) / transformed.length
+    };
+    
+    context.put('transformedUsers', transformed);
+    context.put('statistics', stats);
+    """;
+
+JavascriptWorkflow transformWorkflow = JavascriptWorkflow.builder()
+    .name("DataTransformation")
+    .scriptProvider(dataTransform)
+    .build();
+```
+
+#### Multi-Tenant Configuration
+
+```java
+// Tenant-specific rules loaded dynamically
+public JavascriptWorkflow createTenantWorkflow(String tenantId) {
+    ScriptProvider tenantRules = new FileScriptProvider(
+        Path.of("tenants/" + tenantId + "/rules.js")
+    );
+    
+    return JavascriptWorkflow.builder()
+        .name("TenantRules-" + tenantId)
+        .scriptProvider(tenantRules)
+        .build();
+}
+
+// Each tenant has their own rules file
+// tenants/acme/rules.js - ACME Corp specific rules
+// tenants/globex/rules.js - Globex Corp specific rules
+```
+
+#### A/B Test Logic
+
+```java
+// A/B test logic that can be modified without deployment
+ScriptProvider abTestLogic = () -> """
+    var userId = context.get('userId');
+    var experimentId = context.get('experimentId');
+    
+    // Deterministic assignment based on user ID
+    var hash = userId.split('').reduce((h, c) =>
+        ((h << 5) - h) + c.charCodeAt(0), 0);
+    var variant = Math.abs(hash) % 100 < 50 ? 'A' : 'B';
+    
+    context.put('variant', variant);
+    context.put('experimentAssignment', {
+        userId: userId,
+        experimentId: experimentId,
+        variant: variant,
+        timestamp: new Date().toISOString()
+    });
+    """;
+
+JavascriptWorkflow abTestWorkflow = JavascriptWorkflow.builder()
+    .name("ABTestAssignment")
+    .scriptProvider(abTestLogic)
+    .build();
+```
+
+### Integration with Other Workflows
+
+#### Sequential Composition
+
+```java
+Workflow pipeline = SequentialWorkflow.builder()
+    .name("OrderProcessingPipeline")
+    .task(validateOrderTask)
+    .workflow(JavascriptWorkflow.builder()
+        .name("CalculatePricing")
+        .scriptProvider(pricingScriptProvider)
+        .build())
+    .workflow(JavascriptWorkflow.builder()
+        .name("ApplyPromotions")
+        .scriptProvider(promotionScriptProvider)
+        .build())
+    .task(saveOrderTask)
+    .build();
+```
+
+#### Conditional with JavaScript
+
+```java
+// Use JavaScript for complex condition evaluation
+JavascriptWorkflow conditionEvaluator = JavascriptWorkflow.builder()
+    .name("EvaluateCondition")
+    .scriptProvider(() -> """
+        var order = context.get('order');
+        var result = order.total > 1000 &&
+                     order.items.length > 5 &&
+                     order.customer.tier === 'PREMIUM';
+        context.put('shouldProcess', result);
+        """)
+    .build();
+
+Workflow conditionalWorkflow = SequentialWorkflow.builder()
+    .workflow(conditionEvaluator)
+    .workflow(ConditionalWorkflow.builder()
+        .condition(ctx -> ctx.getTyped("shouldProcess", Boolean.class))
+        .onTrue(premiumProcessingWorkflow)
+        .onFalse(standardProcessingWorkflow)
+        .build())
+    .build();
+```
+
+#### Dynamic Branching with JavaScript
+
+```java
+// JavaScript determines which branch to execute
+JavascriptWorkflow routingLogic = JavascriptWorkflow.builder()
+    .name("DetermineRoute")
+    .scriptProvider(() -> """
+        var request = context.get('request');
+        var route;
+        
+        if (request.priority === 'URGENT' && request.amount < 10000) {
+            route = 'express';
+        } else if (request.documentType === 'CONTRACT') {
+            route = 'legal';
+        } else if (request.requiresApproval) {
+            route = 'approval';
+        } else {
+            route = 'standard';
+        }
+        
+        context.put('selectedRoute', route);
+        """)
+    .build();
+
+Workflow dynamicWorkflow = SequentialWorkflow.builder()
+    .workflow(routingLogic)
+    .workflow(DynamicBranchingWorkflow.builder()
+        .selector(ctx -> ctx.getTyped("selectedRoute", String.class))
+        .branch("express", expressWorkflow)
+        .branch("legal", legalWorkflow)
+        .branch("approval", approvalWorkflow)
+        .branch("standard", standardWorkflow)
+        .build())
+    .build();
+```
+
+### ECMAScript Module (ESM) Support
+
+JavaScriptWorkflow fully supports ES6 modules with import/export syntax, enabling modular, reusable JavaScript code.
+
+#### Module File Extensions
+
+Use `.mjs` extension for module files to indicate ESM format:
+
+```
+project/
+├── scripts/
+│   ├── main.mjs           # Entry point
+│   ├── lib/
+│   │   ├── utils.mjs      # Utility module
+│   │   └── validation.mjs # Validation module
+│   └── business/
+│       └── pricing.mjs    # Business logic module
+```
+
+#### Basic Module Import
+
+**Utility Module (lib/math.mjs):**
+```javascript
+// Export named functions
+export function add(a, b) {
+    return a + b;
+}
+
+export function multiply(a, b) {
+    return a * b;
+}
+
+// Export constants
+export const PI = 3.14159;
+```
+
+**Main Script (main.mjs):**
+```javascript
+import { add, multiply, PI } from './lib/math.mjs';
+
+const x = ctx.get('x');
+const y = ctx.get('y');
+
+ctx.put('sum', add(x, y));
+ctx.put('product', multiply(x, y));
+ctx.put('circleArea', PI * x * x);
+```
+
+**Java Code:**
+```java
+public void example() {
+    Path mainScript = Path.of("scripts/main.mjs");
+    JavascriptWorkflow workflow = JavascriptWorkflow.builder()
+            .name("ModularCalculator")
+            .scriptProvider(new FileScriptProvider(mainScript))
+            .build();
+
+    WorkflowContext context = new WorkflowContext();
+    context.put("x", 5);
+    context.put("y", 3);
+
+    workflow.execute(context);
+}
+```
+
+#### Import Syntax Variations
+
+**Named Imports:**
+```javascript
+import { function1, function2 } from './module.mjs';
+```
+
+**Namespace Import:**
+```javascript
+import * as Utils from './utils.mjs';
+Utils.function1();
+Utils.function2();
+```
+
+**Named with Alias:**
+```javascript
+import { longFunctionName as fn } from './module.mjs';
+```
+
+**Mixed Imports:**
+```javascript
+import defaultExport, { named1, named2 } from './module.mjs';
+```
+
+#### Nested Module Dependencies
+
+Modules can import other modules, creating dependency chains:
+
+**Infrastructure Layer (infrastructure/dbConfig.mjs):**
+```javascript
+export const dbHost = 'localhost';
+export const dbPort = 5432;
+export const dbName = 'app_db';
+```
+
+**Repository Layer (infrastructure/repository.mjs):**
+```javascript
+import { dbHost, dbPort, dbName } from './dbConfig.mjs';
+
+export function getConnectionString() {
+    return `postgresql://${dbHost}:${dbPort}/${dbName}`;
+}
+
+export function fetchData(query) {
+    return {
+        connection: getConnectionString(),
+        query: query,
+        results: [/* ... */]
+    };
+}
+```
+
+**Service Layer (service.mjs):**
+```javascript
+import { getConnectionString, fetchData } from './infrastructure/repository.mjs';
+
+const query = ctx.get('query');
+const data = fetchData(query);
+
+ctx.put('connectionString', getConnectionString());
+ctx.put('results', data);
+```
+
+#### Shared Library Pattern
+
+Create reusable modules shared across multiple workflows:
+
+**Shared Library (lib/validation.mjs):**
+```javascript
+export function isValidEmail(email) {
+    return email && email.includes('@');
+}
+
+export function isNotEmpty(value) {
+    return value !== null && value !== undefined && value !== '';
+}
+```
+
+**Workflow 1 (validateUser.mjs):**
+```javascript
+import { isValidEmail, isNotEmpty } from './lib/validation.mjs';
+
+const user = ctx.get('user');
+const errors = [];
+
+if (!isNotEmpty(user.name)) errors.push('Name required');
+if (!isValidEmail(user.email)) errors.push('Invalid email');
+
+ctx.put('validationErrors', errors);
+```
+
+**Workflow 2 (validateOrder.mjs):**
+```javascript
+import { isNotEmpty } from './lib/validation.mjs';
+
+const order = ctx.get('order');
+const errors = [];
+
+if (!isNotEmpty(order.customerId)) errors.push('Customer ID required');
+
+ctx.put('validationErrors', errors);
+```
+
+Both workflows share the same validation module without code duplication.
+
+#### Barrel Exports (Index Pattern)
+
+Use `index.mjs` files to aggregate exports:
+
+**utils/arrayUtils.mjs:**
+```javascript
+export function first(arr) { return arr[0]; }
+export function last(arr) { return arr[arr.length - 1]; }
+```
+
+**utils/objectUtils.mjs:**
+```javascript
+export function isEmpty(obj) { return Object.keys(obj).length === 0; }
+export function merge(obj1, obj2) { return { ...obj1, ...obj2 }; }
+```
+
+**utils/index.mjs (Barrel):**
+```javascript
+export * from './arrayUtils.mjs';
+export * from './objectUtils.mjs';
+```
+
+**Main Script:**
+```javascript
+// Import everything from barrel
+import { first, last, isEmpty, merge } from './utils/index.mjs';
+
+const arr = ctx.get('array');
+ctx.put('firstElement', first(arr));
+ctx.put('lastElement', last(arr));
+```
+
+#### Circular Module References
+
+GraalVM handles circular dependencies gracefully:
+
+**moduleA.mjs:**
+```javascript
+import { valueB } from './moduleB.mjs';
+
+export const valueA = 'A';
+
+export function getCombined() {
+    return valueA + valueB;
+}
+```
+
+**moduleB.mjs:**
+```javascript
+import { valueA } from './moduleA.mjs';
+
+export const valueB = 'B';
+```
+
+This works because modules are linked before execution. However, avoid calling functions during module initialization.
+
+#### Module Resolution Rules
+
+1. **Relative Imports**: Resolved relative to the importing file
+   ```javascript
+   import { fn } from './module.mjs';        // Same directory
+   import { fn } from '../utils/module.mjs'; // Parent directory
+   import { fn } from './lib/module.mjs';    // Subdirectory
+   ```
+
+2. **URI-Based Resolution**: Script provider must provide a valid URI
+   ```
+   // FileScriptProvider automatically provides file:// URI
+   new FileScriptProvider(Path.of("scripts/main.mjs"))
+   
+   // InlineScriptProvider needs explicit URI for imports
+   new InlineScriptProvider(scriptContent, baseUri)
+   ```
+
+3. **File Extensions Required**: Always include `.mjs` extension
+   ```javascript
+   import { fn } from './module.mjs'; // ✓ Correct
+   import { fn } from './module';     // ✗ Wrong
+   ```
+
+#### Best Practices for ESM Modules
+
+1. **Organize by Function**: Group related functionality in modules
+   ```
+   lib/
+   ├── validation/     # Validation logic
+   ├── formatting/     # Data formatting
+   └── business/       # Business rules
+   ```
+
+2. **Use Barrel Exports**: Simplify imports with index files
+3. **Keep Modules Focused**: One responsibility per module
+4. **Export Named Functions**: Prefer named exports over default exports
+5. **Document Dependencies**: Comment import statements with purpose
+6. **Version Modules**: Use directory structure for versioning if needed
+
+#### Real-World ESM Example: E-Commerce Pricing
+
+**lib/pricing.mjs:**
+```javascript
+export function calculateSubtotal(items) {
+    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+}
+
+export function applyDiscount(amount, percent) {
+    return amount * (1 - percent / 100);
+}
+
+export function calculateTax(amount, rate) {
+    return amount * (rate / 100);
+}
+```
+
+**lib/customerTiers.mjs:**
+```javascript
+import { applyDiscount, calculateTax } from './pricing.mjs';
+
+const TIERS = {
+    'BASIC': { discount: 0, taxRate: 8.5 },
+    'SILVER': { discount: 5, taxRate: 8.5 },
+    'GOLD': { discount: 10, taxRate: 8.5 },
+    'PLATINUM': { discount: 15, taxRate: 7.5 }
+};
+
+export function getPricingForTier(tier) {
+    return TIERS[tier] || TIERS['BASIC'];
+}
+
+export function calculateFinalPrice(subtotal, tier) {
+    const pricing = getPricingForTier(tier);
+    const discounted = applyDiscount(subtotal, pricing.discount);
+    const tax = calculateTax(discounted, pricing.taxRate);
+    
+    return {
+        subtotal,
+        discount: subtotal - discounted,
+        tax,
+        total: discounted + tax
+    };
+}
+```
+
+**main.mjs:**
+```javascript
+import { calculateSubtotal } from './lib/pricing.mjs';
+import { calculateFinalPrice } from './lib/customerTiers.mjs';
+
+const order = ctx.get('order');
+const customerTier = ctx.get('customerTier');
+
+const subtotal = calculateSubtotal(order.items);
+const pricing = calculateFinalPrice(subtotal, customerTier);
+
+ctx.put('pricing', pricing);
+ctx.put('total', pricing.total);
+```
+
+**Java Workflow:**
+```java
+public void example() {
+    JavascriptWorkflow pricingWorkflow = JavascriptWorkflow.builder()
+            .name("CalculatePricing")
+            .scriptProvider(new FileScriptProvider(Path.of("scripts/main.mjs")))
+            .build();
+
+    WorkflowContext context = new WorkflowContext();
+    context.put("order", order);
+    context.put("customerTier", "GOLD");
+
+    pricingWorkflow.execute(context);
+    Map<String, Object> pricing = context.getTyped("pricing", Map.class);
+}
+```
+
+### Script Reloading and Hot Updates
+
+Scripts are loaded fresh on each execution, enabling hot updates:
+
+```java
+public void example() {
+    FileScriptProvider provider = new FileScriptProvider(Path.of("rules/business.js"));
+    JavascriptWorkflow workflow = JavascriptWorkflow.builder()
+            .name("BusinessRules")
+            .scriptProvider(provider)
+            .build();
+
+    // First execution - uses current script
+    workflow.execute(context1);
+
+    // Update the script file externally
+    Files.writeString(Path.of("rules/business.js"), newScript);
+
+    // Second execution - automatically uses updated script
+    workflow.execute(context2);
+}
+```
+
+### Security Considerations
+
+The JavascriptWorkflow runs in a secure sandbox:
+
+- **No Host Class Access**: Scripts cannot access `java.lang.System`, `java.lang.Runtime`, or use reflection
+- **No File System Access**: Scripts cannot read/write files directly (except through provided APIs)
+- **No Network Access**: Scripts cannot make HTTP requests directly
+- **Context-Only Communication**: All data exchange happens through `WorkflowContext`
+
+```java
+// This will FAIL - security violation
+ScriptProvider malicious = () -> """
+    var System = Java.type('java.lang.System');
+    System.exit(1);  // Not allowed
+    """;
+```
+
+### Performance Considerations
+
+- **Shared Engine**: All JavascriptWorkflow instances share a GraalVM engine for optimal performance
+- **JIT Compilation**: Frequently executed scripts are compiled to native code
+- **AST Caching**: Parsed scripts are cached for faster subsequent executions
+- **First Execution Cost**: Initial script execution includes engine warmup time
+- **Script Complexity**: Complex scripts with heavy computation may impact performance
+
+### Error Handling
+
+```java
+public void example() {
+    JavascriptWorkflow workflow = JavascriptWorkflow.builder()
+            .name("RiskyOperation")
+            .scriptProvider(riskyScriptProvider)
+            .build();
+
+    WorkflowResult result = workflow.execute(context);
+
+    if (result.getStatus() == WorkflowStatus.FAILED) {
+        Throwable error = result.getError();
+
+        if (error.getCause() instanceof ScriptLoadException) {
+            // Script file not found or couldn't be loaded
+            log.error("Failed to load script", error);
+        } else {
+            // JavaScript runtime error (syntax, runtime exception, etc.)
+            log.error("JavaScript execution failed", error);
+        }
+    }
+}
+```
+
+### Best Practices
+
+1. **Keep Scripts Focused**: Each script should have a single, clear responsibility
+2. **Use File-Based Scripts**: Store complex logic in files for better maintainability
+3. **Validate Inputs**: Check context inputs at the start of scripts
+4. **Error Messages**: Provide clear error messages in scripts
+5. **Testing**: Test scripts independently before integrating into workflows
+6. **Documentation**: Document expected context inputs and outputs
+7. **Versioning**: Version your script files for audit trails
+8. **Type Safety**: Use TypeScript definitions for better IDE support (optional)
+
 ## Workflow Composition
 
 ### Nesting Workflows
@@ -1351,6 +2138,7 @@ The Workflow Engine provides powerful orchestration capabilities through:
 6. **Task Workflow**: Uniform task/workflow interface
 7. **Rate Limited Workflow**: Throttle workflow execution
 8. **Timeout Workflow**: Add time constraints to workflows
+9. **JavaScript Workflow**: Dynamic script-based business logic
 
 All workflows:
 - Share a common interface
@@ -1367,3 +2155,4 @@ Choose the right workflow type based on your execution semantics:
 - **Single task** → Task Workflow
 - **Rate control** → Rate Limited Workflow
 - **Time constraints** → Timeout Workflow
+- **Dynamic business rules** → JavaScript Workflow

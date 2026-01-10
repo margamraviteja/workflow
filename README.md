@@ -1,28 +1,60 @@
 # Workflow Engine
 
-> [!IMPORTANT]
-> Note: Codebase is generated/implemented by Copilot, Claude and Gemini AI Tools
-
-A lightweight, flexible Java workflow orchestration framework for composing and executing tasks with support for sequential and parallel execution, conditional branching, retry policies, and pluggable execution strategies.
+A flexible workflow orchestration library for Java that enables you to build complex business processes with ease. Built on top of modern Java features and GraalVM, it provides both compile-time type safety and runtime flexibility.
 
 ## Overview
 
-It provides a clean API for orchestrating tasks, handling errors, implementing retry logic, and managing execution contexts. The framework supports multiple execution patterns including sequential, parallel, conditional, and dynamic branching workflows.
+The Workflow Engine is a comprehensive orchestration framework that allows you to:
+
+- **Compose Complex Workflows**: Build sophisticated business processes by composing simple, reusable workflow components
+- **Execute Dynamic Logic**: Run JavaScript-based business rules that can be updated without recompiling
+- **Handle Failures Gracefully**: Built-in retry policies, fallback mechanisms, and circuit breakers
+- **Control Execution**: Rate limiting, timeouts, parallel execution with pluggable strategies
+- **Monitor and Debug**: Comprehensive logging, workflow listeners, and execution tracing
+- **Integrate Seamlessly**: Spring Boot autoconfiguration, annotation-based workflows, database-driven configuration
 
 ## Key Features
 
-- **🔄 Multiple Workflow Types**: Sequential, parallel, conditional, dynamic branching, fallback, rate-limited, timeout workflows
-- **📝 Task Abstraction**: Rich set of built-in tasks (HTTP, file I/O, JavaScript execution, shell commands, etc.)
-- **🔁 Retry & Timeout Policies**: Configurable retry logic with multiple backoff strategies and timeout handling
-- **⚡ Execution Strategies**: Pluggable execution strategies (thread pool, reactive/Project Reactor)
-- **🚦 Rate Limiting**: Built-in rate limiting with multiple algorithms (Fixed Window, Sliding Window, Token Bucket, Leaky Bucket, Resilience4j, Bucket4j)
-- **🔧 Annotation-Based Configuration**: Define workflows using Java annotations or pure Java DSL
-- **💾 Database Configuration**: Store workflow definitions in database for dynamic configuration
-- **🔑 Type-Safe Context**: Thread-safe, type-safe context for data flow between tasks
-- **🎯 Fail-Fast & Fallback**: Support for fail-fast execution and graceful fallback mechanisms
-- **📊 Monitoring**: Track workflow execution with detailed results and timestamps. Workflow listeners for observability and custom actions
-- **🧩 Composable**: Workflows can be nested and composed for complex orchestrations
-- **🌳 Workflow Visualization**: Tree-based visualization of workflow hierarchies
+### 🎯 **Multiple Workflow Types**
+- **Sequential**: Execute workflows one after another
+- **Parallel**: Run workflows concurrently with configurable strategies
+- **Conditional**: Branch based on runtime conditions
+- **Dynamic Branching**: Multi-way routing with selector functions
+- **Fallback**: Graceful error recovery with primary/fallback pattern
+- **Rate Limited**: Control execution frequency with multiple algorithms
+- **Timeout**: Add time constraints to any workflow
+- **JavaScript**: Execute dynamic business logic with full ESM support
+
+### 🚀 **JavaScript Workflow with ESM Support**
+- **GraalVM-Powered**: High-performance JavaScript execution with JIT compilation
+- **ES6 Modules**: Full support for import/export syntax
+- **Secure Sandbox**: Restricted execution environment for safety
+- **Flexible Script Sources**: Load from files, classpath, or inline
+- **Hot Reload**: Update scripts without restarting the application
+
+### 🔧 **Rich Task Library**
+- HTTP tasks (GET, POST, PUT, DELETE)
+- File I/O operations
+- Shell command execution
+- Conditional execution
+- Composite and Parallel task execution
+
+### 🛡️ **Resilience Patterns**
+- Retry policies (fixed, exponential backoff, jitter)
+- Timeout policies
+- Fallback workflows
+- Rate limiting (fixed window, sliding window, token bucket, leaky bucket)
+
+### 📊 **Observability**
+- Workflow lifecycle listeners
+- Detailed execution logging
+- Visual workflow tree rendering
+
+### 🏗️ **Framework Integration**
+- Annotation-based workflow definition
+- Database-driven workflow configuration
+- Spring Boot auto-configuration
+- Dependency injection support
 
 ## Quick Start
 
@@ -59,12 +91,12 @@ public class MyWorkflowApp {
 
 ```java
 Workflow parallelWorkflow = ParallelWorkflow.builder()
-    .name("DataAggregation")
-    .task(new GetTask("https://api.example.com/users", "usersData"))
-    .task(new GetTask("https://api.example.com/orders", "ordersData"))
-    .task(new GetTask("https://api.example.com/products", "productsData"))
-    .failFast(true)
-    .build();
+        .name("DataAggregation")
+        .task(new GetTask("https://api.example.com/users", "usersData"))
+        .task(new GetTask("https://api.example.com/orders", "ordersData"))
+        .task(new GetTask("https://api.example.com/products", "productsData"))
+        .failFast(true)
+        .build();
 
 WorkflowContext context = new WorkflowContext();
 WorkflowResult result = parallelWorkflow.execute(context);
@@ -74,24 +106,74 @@ WorkflowResult result = parallelWorkflow.execute(context);
 
 ```java
 Workflow conditionalWorkflow = ConditionalWorkflow.builder()
-    .name("OrderProcessing")
-    .condition(context -> {
-        Integer amount = context.getTyped("orderAmount", Integer.class);
-        return amount != null && amount > 1000;
-    })
-    .whenTrue(expensiveOrderWorkflow)
-    .whenFalse(standardOrderWorkflow)
-    .build();
+        .name("OrderProcessing")
+        .condition(context -> {
+            Integer amount = context.getTyped("orderAmount", Integer.class);
+            return amount != null && amount > 1000;
+        })
+        .whenTrue(expensiveOrderWorkflow)
+        .whenFalse(standardOrderWorkflow)
+        .build();
+```
+
+### JavaScript Workflow
+
+```java
+import com.workflow.JavascriptWorkflow;
+import com.workflow.script.FileScriptProvider;
+import java.nio.file.Path;
+
+public class JavaScriptExample {
+    static void main(String[] args) {
+        // Create workflow from JavaScript file
+        Workflow workflow = JavascriptWorkflow.builder()
+            .name("DynamicPricing")
+            .scriptProvider(new FileScriptProvider(Path.of("rules/pricing.js")))
+            .build();
+
+        WorkflowContext context = new WorkflowContext();
+        context.put("basePrice", 100.0);
+        context.put("customerTier", "GOLD");
+        
+        workflow.execute(context);
+        
+        Double finalPrice = context.getTyped("finalPrice", Double.class);
+    }
+}
+```
+
+### ESM Module Support
+
+```javascript
+// lib/pricing.mjs
+export function calculateDiscount(price, tier) {
+    const discounts = {
+        'BASIC': 0,
+        'SILVER': 0.05,
+        'GOLD': 0.10,
+        'PLATINUM': 0.15
+    };
+    return price * (1 - discounts[tier]);
+}
+
+// main.mjs
+import { calculateDiscount } from './lib/pricing.mjs';
+
+const price = ctx.get('basePrice');
+const tier = ctx.get('customerTier');
+const final = calculateDiscount(price, tier);
+
+ctx.put('finalPrice', final);
 ```
 
 ### With Retry and Timeout
 
 ```java
 TaskDescriptor taskWithPolicies = TaskDescriptor.builder()
-    .task(new PostTask("https://api.example.com/process", "requestBody", "response"))
-    .retryPolicy(RetryPolicy.exponentialBackoff(3, 1000))
-    .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
-    .build();
+        .task(new PostTask("https://api.example.com/process", "requestBody", "response"))
+        .retryPolicy(RetryPolicy.exponentialBackoff(3, 1000))
+        .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
+        .build();
 
 Workflow workflow = new TaskWorkflow(taskWithPolicies);
 ```
@@ -103,21 +185,21 @@ Workflow workflow = new TaskWorkflow(taskWithPolicies);
 RateLimitStrategy limiter = new FixedWindowRateLimiter(100, Duration.ofMinutes(1));
 
 Workflow rateLimited = RateLimitedWorkflow.builder()
-    .workflow(apiWorkflow)
-    .rateLimitStrategy(limiter)
-    .build();
+        .workflow(apiWorkflow)
+        .rateLimitStrategy(limiter)
+        .build();
 
 // Or use Token Bucket for burst support
 RateLimitStrategy tokenBucket = new TokenBucketRateLimiter(
-    100,                        // 100 requests per second
-    200,                        // Burst capacity of 200
-    Duration.ofSeconds(1)
+        100,                        // 100 requests per second
+        200,                        // Burst capacity of 200
+        Duration.ofSeconds(1)
 );
 
 // Or use Resilience4j for production-ready rate limiting
 RateLimitStrategy resilience4j = new Resilience4jRateLimiter(
-    100,                        // 100 requests per second
-    Duration.ofSeconds(1)       // Refresh period
+        100,                        // 100 requests per second
+        Duration.ofSeconds(1)       // Refresh period
 );
 ```
 
@@ -176,11 +258,11 @@ public class MyWorkflowApp {
         System.out.println(workflow.toTreeString());
         /* Output:
         └── ComplexPipeline [Sequence]
-            ├── Step1 [Task]
+            ├── Step1 (Task)
             ├── ParallelTasks [Parallel]
-            │   ├── Step2A [Task]
-            │   └── Step2B [Task]
-            └── Step3 [Task]
+            │   ├── Step2A (Task)
+            │   └── Step2B (Task)
+            └── Step3 (Task)
         */
     }
 }
@@ -361,9 +443,9 @@ Allows controlled bursts while maintaining average rate. Best for APIs that supp
 
 ```java
 RateLimitStrategy limiter = new TokenBucketRateLimiter(
-    100,                        // Tokens per second
-    200,                        // Burst capacity
-    Duration.ofSeconds(1)
+        100,                        // Tokens per second
+        200,                        // Burst capacity
+        Duration.ofSeconds(1)
 );
 ```
 
@@ -372,8 +454,8 @@ Ensures constant output rate. Best for steady-state processing.
 
 ```java
 RateLimitStrategy limiter = new LeakyBucketRateLimiter(
-    100,                        // Requests per second
-    Duration.ofSeconds(1)
+        100,                        // Requests per second
+        Duration.ofSeconds(1)
 );
 ```
 
@@ -383,16 +465,16 @@ Production-ready rate limiting using the Resilience4j library. Best for producti
 ```java
 // Basic usage
 RateLimitStrategy limiter = new Resilience4jRateLimiter(
-    100,                        // Requests per second
-    Duration.ofSeconds(1)       // Refresh period
-);
+                100,                        // Requests per second
+                Duration.ofSeconds(1)       // Refresh period
+        );
 
 // With custom configuration
 RateLimiterConfig config = RateLimiterConfig.custom()
-    .limitForPeriod(100)
-    .limitRefreshPeriod(Duration.ofSeconds(1))
-    .timeoutDuration(Duration.ofSeconds(5))
-    .build();
+        .limitForPeriod(100)
+        .limitRefreshPeriod(Duration.ofSeconds(1))
+        .timeoutDuration(Duration.ofSeconds(5))
+        .build();
 
 RateLimitStrategy limiter = new Resilience4jRateLimiter("myAPI", config);
 
@@ -414,23 +496,23 @@ High-performance rate limiting using the Bucket4j library based on token bucket 
 ```java
 // Basic usage
 RateLimitStrategy limiter = new Bucket4jRateLimiter(
-    100,                        // Capacity
-    Duration.ofSeconds(1)       // Refill period
-);
+                100,                        // Capacity
+                Duration.ofSeconds(1)       // Refill period
+        );
 
 // With burst capacity
 RateLimitStrategy limiter = new Bucket4jRateLimiter(
-    200,                        // Burst capacity
-    100,                        // Refill tokens per period
-    Duration.ofSeconds(1),      // Refill period
-    Bucket4jRateLimiter.RefillStrategy.GREEDY
+        200,                        // Burst capacity
+        100,                        // Refill tokens per period
+        Duration.ofSeconds(1),      // Refill period
+        Bucket4jRateLimiter.RefillStrategy.GREEDY
 );
 
 // With custom bandwidth
 Bandwidth bandwidth = Bandwidth.builder()
-    .capacity(100)
-    .refillGreedy(100, Duration.ofSeconds(1))
-    .build();
+        .capacity(100)
+        .refillGreedy(100, Duration.ofSeconds(1))
+        .build();
 
 RateLimitStrategy limiter = new Bucket4jRateLimiter(bandwidth);
 ```
@@ -450,19 +532,19 @@ Define workflows declaratively using annotations:
 ```java
 @WorkflowAnnotation(name = "OrderProcessingWorkflow", parallel = false)
 public class OrderWorkflowDefinition {
-    
+
     @WorkflowMethod(order = 1)
     public Workflow validateOrder() {
         return new TaskWorkflow(new ValidationTask());
     }
-    
+
     @TaskMethod(order = 2)
     public Task processPayment() {
         return context -> {
             // Payment processing logic
         };
     }
-    
+
     @WorkflowRef(name = "EmailNotification", order = 3)
     public void sendNotification() {
         // References registered workflow
@@ -475,7 +557,7 @@ public class OrderWorkflowDefinition {
 ```java
 @Configuration
 public class WorkflowConfig {
-    
+
     @Bean
     public Workflow orderProcessing(AnnotationWorkflowProcessor processor) {
         return processor.buildWorkflow(OrderWorkflowDefinition.class);
@@ -489,14 +571,14 @@ Configure workflows dynamically from database:
 
 ```sql
 -- Define workflow
-INSERT INTO workflow (name, description, is_parallel) 
+INSERT INTO workflow (name, description, is_parallel)
 VALUES ('DataPipeline', 'Data processing pipeline', FALSE);
 
 -- Define workflow steps
 INSERT INTO workflow_steps (workflow_id, name, instance_name, order_index) VALUES
-  (1, 'Extract', 'ExtractWorkflow', 1),
-  (1, 'Transform', 'TransformWorkflow', 2),
-  (1, 'Load', 'LoadWorkflow', 3);
+                                                                               (1, 'Extract', 'ExtractWorkflow', 1),
+                                                                               (1, 'Transform', 'TransformWorkflow', 2),
+                                                                               (1, 'Load', 'LoadWorkflow', 3);
 ```
 
 ```java
@@ -645,12 +727,12 @@ public class MetricsListener implements WorkflowListener {
     public void onStart(String name, WorkflowContext ctx) {
         metrics.counter("workflow.started").increment();
     }
-    
+
     @Override
     public void onSuccess(String name, WorkflowContext ctx, WorkflowResult result) {
         metrics.timer("workflow.duration").record(result.getExecutionDuration());
     }
-    
+
     @Override
     public void onFailure(String name, WorkflowContext ctx, Throwable error) {
         metrics.counter("workflow.failed").increment();
@@ -674,14 +756,14 @@ Factory methods for creating workflow builders:
 ```java
 // Concise workflow creation
 Workflow sequential = Workflows.sequential("MyWorkflow")
-    .task(task1)
-    .task(task2)
-    .build();
+                .task(task1)
+                .task(task2)
+                .build();
 
 Workflow parallel = Workflows.parallel("ParallelTasks")
-    .workflow(workflow1)
-    .workflow(workflow2)
-    .build();
+        .workflow(workflow1)
+        .workflow(workflow2)
+        .build();
 ```
 
 ### ValidationUtils
@@ -770,9 +852,25 @@ mvn test
 # Generate Javadoc
 mvn javadoc:javadoc
 
+# View Javadoc
+open target/site/apidocs/index.html
+
+# Run tests with coverage
+mvn clean test jacoco:report
+
+# Check test coverage report
+open target/site/jacoco/index.html
+
 # Check code style
 mvn spotless:check
 
 # Apply formatting
 mvn spotless:apply
+```
+
+### Run Examples
+
+```bash
+# Run with Maven exec plugin and examples profile
+mvn exec:java -Pexamples -Dexec.mainClass="com.workflow.examples.DataPipelineWorkflow"
 ```

@@ -17,19 +17,23 @@ The database configuration approach provides a clean separation between workflow
 
 Stores workflow metadata with the following columns:
 
-| Column        | Type              | Description                                        |
-|---------------|-------------------|----------------------------------------------------|
-| `id`          | INT (PRIMARY KEY) | Unique workflow identifier                         |
-| `name`        | VARCHAR(255)      | Unique workflow name                               |
-| `description` | VARCHAR(255)      | Optional workflow description                      |
-| `is_parallel` | BOOLEAN           | Whether steps execute in parallel (default: false) |
+| Column          | Type              | Description                                                          |
+|-----------------|-------------------|----------------------------------------------------------------------|
+| `id`            | INT (PRIMARY KEY) | Unique workflow identifier                                           |
+| `name`          | VARCHAR(255)      | Unique workflow name                                                 |
+| `description`   | VARCHAR(255)      | Optional workflow description                                        |
+| `is_parallel`   | BOOLEAN           | Whether steps execute in parallel (default: false)                   |
+| `fail_fast`     | BOOLEAN           | Stop immediately on first failure in parallel mode (default: false)  |
+| `share_context` | BOOLEAN           | Share context across parallel workflows (default: true)              |
 
 ```sql
 CREATE TABLE workflow (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL UNIQUE,
   description VARCHAR(255),
-  is_parallel BOOLEAN DEFAULT FALSE
+  is_parallel BOOLEAN DEFAULT FALSE,
+  fail_fast BOOLEAN DEFAULT FALSE,
+  share_context BOOLEAN DEFAULT TRUE
 );
 ```
 
@@ -66,7 +70,18 @@ CREATE TABLE workflow_steps (
 A record representing a workflow row in the database:
 
 ```java
-public record WorkflowMetadata(String name, String description, boolean isParallel) {}
+public record WorkflowMetadata(
+    String name, 
+    String description, 
+    boolean isParallel, 
+    boolean failFast, 
+    boolean shareContext) {
+  
+  // Factory method with default values
+  public static WorkflowMetadata of(String name, String description, boolean isParallel) {
+    return new WorkflowMetadata(name, description, isParallel, false, true);
+  }
+}
 ```
 
 ### WorkflowStepMetadata
@@ -87,13 +102,13 @@ import java.util.List;
 import java.util.Optional;
 
 public class WorkflowService {
-    private final WorkflowRepository repository;
+    private final WorkflowConfigRepository repository;
 
-    public WorkflowService(WorkflowRepository repository) {
+    public WorkflowService(WorkflowConfigRepository repository) {
         this.repository = repository;
     }
 
-    public void displayWorkflowDetails(String name) {
+    public void displayWorkflowDetails(String name) throws SQLException {
         // 1. Fetch a single workflow (wrapped in Optional for safety)
         Optional<WorkflowMetadata> workflow = repository.getWorkflow(name);
 
@@ -107,7 +122,7 @@ public class WorkflowService {
         boolean exists = repository.workflowExists(name);
 
         // Example usage:
-        workflow.ifPresent(m -> System.out.println("Found: " + m.getName()));
+        workflow.ifPresent(m -> System.out.println("Found: " + m.name()));
     }
 }
 ```
@@ -172,9 +187,17 @@ public class WorkflowManager {
 Insert workflow definitions:
 
 ```sql
-INSERT INTO workflow (name, description, is_parallel) VALUES 
-  ('DataProcessingPipeline', 'Sequential data processing', FALSE),
-  ('ParallelValidation', 'Parallel validation', TRUE);
+-- Sequential workflow (default behavior)
+INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) VALUES 
+  ('DataProcessingPipeline', 'Sequential data processing', FALSE, FALSE, TRUE);
+
+-- Parallel workflow with fail-fast enabled
+INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) VALUES 
+  ('ParallelValidation', 'Parallel validation with fail-fast', TRUE, TRUE, TRUE);
+
+-- Parallel workflow with isolated contexts
+INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) VALUES 
+  ('IsolatedParallelProcessing', 'Parallel processing with isolated contexts', TRUE, FALSE, FALSE);
 
 -- Get workflow ID
 SELECT id FROM workflow WHERE name = 'DataProcessingPipeline'; -- e.g., 1
@@ -217,8 +240,12 @@ public class DatabaseWorkflowLauncher {
 2. **Validate Order Indices**: Set `order_index` correctly to ensure proper execution order.
 
 3. **Unique Names**: Use unique and descriptive names for workflows and steps.
-4. 
-5. **Use Transactions**: When inserting multiple workflows and steps, use database transactions to ensure consistency.
+
+4. **Use Transactions**: When inserting multiple workflows and steps, use database transactions to ensure consistency.
+
+5. **Parallel Workflow Configuration**: When setting `is_parallel` to true, consider also configuring `fail_fast` and `share_context` based on your requirements:
+   - Set `fail_fast=true` if you want to abort all parallel tasks when the first failure occurs
+   - Set `share_context=false` if you want to isolate context between parallel workflow branches
 
 ## Example: Complete Setup
 

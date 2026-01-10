@@ -55,7 +55,9 @@ class DatabaseWorkflowProcessorTest {
               + "id INT PRIMARY KEY AUTO_INCREMENT,"
               + "name VARCHAR(255) NOT NULL UNIQUE,"
               + "description VARCHAR(255),"
-              + "is_parallel BOOLEAN DEFAULT FALSE"
+              + "is_parallel BOOLEAN DEFAULT FALSE,"
+              + "fail_fast BOOLEAN DEFAULT FALSE,"
+              + "share_context BOOLEAN DEFAULT TRUE"
               + ")");
 
       stmt.execute(
@@ -324,5 +326,110 @@ class DatabaseWorkflowProcessorTest {
       String name, int order, java.util.List<Integer> tracker) {
     Workflow workflow = new TaskWorkflow(_ -> tracker.add(order));
     registry.register(name, workflow);
+  }
+
+  @Test
+  void testParallelWorkflowWithFailFastTrue() throws SQLException {
+    // Setup - parallel workflow with fail_fast=true
+    try (Connection conn = dataSource.getConnection();
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) "
+              + "VALUES ('FailFastWorkflow', 'Test', TRUE, TRUE, TRUE)");
+      var idResult =
+          stmt.executeQuery(
+              "SELECT id FROM workflow WHERE name = 'FailFastWorkflow' ORDER BY id DESC LIMIT 1");
+      idResult.next();
+      int workflowId = idResult.getInt("id");
+
+      stmt.execute(
+          "INSERT INTO workflow_steps (workflow_id, name, description, instance_name, order_index) VALUES ("
+              + workflowId
+              + ", 'Step1', 'Test step', 'Task1', 1)");
+      stmt.execute(
+          "INSERT INTO workflow_steps (workflow_id, name, description, instance_name, order_index) VALUES ("
+              + workflowId
+              + ", 'Step2', 'Test step', 'Task2', 2)");
+    }
+
+    registerTestWorkflow("Task1");
+    registerTestWorkflow("Task2");
+
+    // Execute
+    Workflow workflow = processor.buildWorkflow("FailFastWorkflow");
+
+    // Assert
+    assertNotNull(workflow);
+    assertInstanceOf(ParallelWorkflow.class, workflow);
+    assertEquals("FailFastWorkflow", workflow.getName());
+  }
+
+  @Test
+  void testParallelWorkflowWithShareContextFalse() throws SQLException {
+    // Setup - parallel workflow with share_context=false
+    try (Connection conn = dataSource.getConnection();
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) "
+              + "VALUES ('IsolatedWorkflow', 'Test', TRUE, FALSE, FALSE)");
+      var idResult =
+          stmt.executeQuery(
+              "SELECT id FROM workflow WHERE name = 'IsolatedWorkflow' ORDER BY id DESC LIMIT 1");
+      idResult.next();
+      int workflowId = idResult.getInt("id");
+
+      stmt.execute(
+          "INSERT INTO workflow_steps (workflow_id, name, description, instance_name, order_index) VALUES ("
+              + workflowId
+              + ", 'Step1', 'Test step', 'Task1', 1)");
+      stmt.execute(
+          "INSERT INTO workflow_steps (workflow_id, name, description, instance_name, order_index) VALUES ("
+              + workflowId
+              + ", 'Step2', 'Test step', 'Task2', 2)");
+    }
+
+    registerTestWorkflow("Task1");
+    registerTestWorkflow("Task2");
+
+    // Execute
+    Workflow workflow = processor.buildWorkflow("IsolatedWorkflow");
+
+    // Assert
+    assertNotNull(workflow);
+    assertInstanceOf(ParallelWorkflow.class, workflow);
+    assertEquals("IsolatedWorkflow", workflow.getName());
+  }
+
+  @Test
+  void testParallelWorkflowWithBothOptionsSet() throws SQLException {
+    // Setup - parallel workflow with both options set
+    try (Connection conn = dataSource.getConnection();
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO workflow (name, description, is_parallel, fail_fast, share_context) "
+              + "VALUES ('CustomWorkflow', 'Test', TRUE, TRUE, FALSE)");
+      var idResult =
+          stmt.executeQuery(
+              "SELECT id FROM workflow WHERE name = 'CustomWorkflow' ORDER BY id DESC LIMIT 1");
+      idResult.next();
+      int workflowId = idResult.getInt("id");
+
+      stmt.execute(
+          "INSERT INTO workflow_steps (workflow_id, name, description, instance_name, order_index) VALUES ("
+              + workflowId
+              + ", 'Step1', 'Test step', 'Task1', 1)");
+    }
+
+    registerTestWorkflow("Task1");
+
+    // Execute
+    Workflow workflow = processor.buildWorkflow("CustomWorkflow");
+    WorkflowContext context = new WorkflowContext();
+    WorkflowResult result = workflow.execute(context);
+
+    // Assert
+    assertNotNull(workflow);
+    assertInstanceOf(ParallelWorkflow.class, workflow);
+    assertEquals(WorkflowStatus.SUCCESS, result.getStatus());
   }
 }

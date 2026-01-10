@@ -101,7 +101,10 @@ public class JavaAnnotationWorkflowProcessor extends AnnotationWorkflowProcessor
 
     if (annotation.parallel()) {
       ParallelWorkflow.ParallelWorkflowBuilder builder =
-          ParallelWorkflow.builder().name(workflowName).shareContext(annotation.shareContext());
+          ParallelWorkflow.builder()
+              .name(workflowName)
+              .shareContext(annotation.shareContext())
+              .failFast(annotation.failFast());
       workflows.forEach(builder::workflow);
       return builder.build();
     } else {

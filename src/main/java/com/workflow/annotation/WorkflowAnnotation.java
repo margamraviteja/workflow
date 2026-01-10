@@ -54,9 +54,30 @@ public @interface WorkflowAnnotation {
    * com.workflow.context.WorkflowContext}. Defaults to true and is configurable for parallel
    * workflows.
    *
+   * <p>When parallel=true and shareContext=true: All child workflows share the same context
+   * instance. When parallel=true and shareContext=false: Each child workflow gets its own copy of
+   * the context.
+   *
+   * <p>This setting only applies when parallel=true. For sequential workflows, context is always
+   * shared.
+   *
    * @return true if context should be shared for parallel workflows
    */
   boolean shareContext() default true;
+
+  /**
+   * Whether to stop execution immediately when the first failure occurs in parallel workflows.
+   * Defaults to false (wait for all workflows to complete).
+   *
+   * <p>When parallel=true and failFast=true: Cancels all remaining workflows on first failure. When
+   * parallel=true and failFast=false: Waits for all workflows to complete even if some fail.
+   *
+   * <p>This setting only applies when parallel=true. Sequential workflows always fail fast by
+   * design.
+   *
+   * @return true to stop on first failure in parallel workflows
+   */
+  boolean failFast() default false;
 
   /**
    * Optional description of the workflow for documentation purposes.

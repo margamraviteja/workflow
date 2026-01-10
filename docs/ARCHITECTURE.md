@@ -48,10 +48,10 @@ The Workflow Engine is designed as a flexible, extensible orchestration framewor
 │  │   Dynamic    │  │   Fallback   │  │      Task            │  │
 │  │  Branching   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
-│  ┌──────────────┐  ┌──────────────┐                            │
-│  │ Rate Limited │  │   Timeout    │                            │
-│  │   Workflow   │  │   Workflow   │                            │
-│  └──────────────┘  └──────────────┘                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ Rate Limited │  │   Timeout    │  │    Javascript        │  │
+│  │   Workflow   │  │   Workflow   │  │     Workflow         │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -400,6 +400,18 @@ else:
    - WorkflowCompositionException
    - TaskTimeoutException
    - Circular dependency detection
+
+6. **Rate Limiting**
+   - Six rate limiting strategies (Fixed Window, Sliding Window, Token Bucket, Leaky Bucket, Resilience4j, Bucket4j)
+   - High-performance implementations
+   - Production-ready observability
+   - Burst support and accurate limiting
+
+7. **JavaScript Execution**
+   - GraalVM Polyglot integration
+   - ESM module support
+   - Security sandbox
+   - Context binding
 
 ## Component Interactions
 
@@ -955,3 +967,10 @@ The Workflow Engine architecture provides:
 7. **Observability**: Comprehensive logging and result tracking
 
 The architecture supports both simple use cases (sequential task execution) and complex scenarios (parallel orchestration with dynamic branching and retry logic), all while maintaining clean abstractions and predictable behavior.
+
+### External Resources
+
+- [GraalVM JavaScript](https://www.graalvm.org/latest/reference-manual/js/) - JavaScript runtime documentation
+- [Project Reactor](https://projectreactor.io/docs) - Reactive programming guide
+- [Resilience4j](https://resilience4j.readme.io/) - Resilience patterns documentation
+- [Bucket4j](https://bucket4j.com/) - Rate limiting library documentation

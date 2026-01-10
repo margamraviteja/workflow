@@ -20,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
  *   id INT PRIMARY KEY AUTO_INCREMENT,
  *   name VARCHAR(255) NOT NULL UNIQUE,
  *   description VARCHAR(255),
- *   is_parallel BOOLEAN DEFAULT FALSE
+ *   is_parallel BOOLEAN DEFAULT FALSE,
+ *   fail_fast BOOLEAN DEFAULT FALSE,
+ *   share_context BOOLEAN DEFAULT TRUE
  * );
  *
  * CREATE TABLE workflow_steps (
@@ -49,6 +51,8 @@ public class WorkflowConfigRepository {
   public static final String NAME = "name";
   public static final String DESCRIPTION = "description";
   public static final String IS_PARALLEL = "is_parallel";
+  public static final String FAIL_FAST = "fail_fast";
+  public static final String SHARE_CONTEXT = "share_context";
   public static final String INSTANCE_NAME = "instance_name";
   public static final String ORDER_INDEX = "order_index";
 
@@ -71,7 +75,8 @@ public class WorkflowConfigRepository {
    * @throws SQLException if database access fails
    */
   public Optional<WorkflowMetadata> getWorkflow(String workflowName) throws SQLException {
-    String query = "SELECT name, description, is_parallel FROM workflow WHERE name = ?";
+    String query =
+        "SELECT name, description, is_parallel, fail_fast, share_context FROM workflow WHERE name = ?";
 
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -82,8 +87,11 @@ public class WorkflowConfigRepository {
           String name = rs.getString(NAME);
           String description = rs.getString(DESCRIPTION);
           boolean isParallel = rs.getBoolean(IS_PARALLEL);
+          boolean failFast = rs.getBoolean(FAIL_FAST);
+          boolean shareContext = rs.getBoolean(SHARE_CONTEXT);
           log.debug("Fetched workflow metadata: {}", name);
-          return Optional.of(WorkflowMetadata.of(name, description, isParallel));
+          return Optional.of(
+              WorkflowMetadata.of(name, description, isParallel, failFast, shareContext));
         }
       }
     }
@@ -135,7 +143,8 @@ public class WorkflowConfigRepository {
    * @throws SQLException if database access fails
    */
   public List<WorkflowMetadata> getAllWorkflows() throws SQLException {
-    String query = "SELECT name, description, is_parallel FROM workflow ORDER BY name ASC";
+    String query =
+        "SELECT name, description, is_parallel, fail_fast, share_context FROM workflow ORDER BY name ASC";
     List<WorkflowMetadata> workflows = new ArrayList<>();
 
     try (Connection conn = dataSource.getConnection();
@@ -145,7 +154,9 @@ public class WorkflowConfigRepository {
           String name = rs.getString(NAME);
           String description = rs.getString(DESCRIPTION);
           boolean isParallel = rs.getBoolean(IS_PARALLEL);
-          workflows.add(WorkflowMetadata.of(name, description, isParallel));
+          boolean failFast = rs.getBoolean(FAIL_FAST);
+          boolean shareContext = rs.getBoolean(SHARE_CONTEXT);
+          workflows.add(WorkflowMetadata.of(name, description, isParallel, failFast, shareContext));
         }
       }
     }

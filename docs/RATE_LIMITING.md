@@ -704,17 +704,19 @@ Bandwidth getBandwidth();          // Get bandwidth configuration
 ### Example: Simple Rate Limiting
 
 ```java
-// Allow 50 API calls per minute
-RateLimitStrategy limiter = new Bucket4jRateLimiter(50, Duration.ofMinutes(1));
+public void example() {
+    // Allow 50 API calls per minute
+    RateLimitStrategy limiter = new Bucket4jRateLimiter(50, Duration.ofMinutes(1));
 
-Workflow apiWorkflow = RateLimitedWorkflow.builder()
-    .workflow(callExternalApiWorkflow)
-    .rateLimitStrategy(limiter)
-    .build();
+    Workflow apiWorkflow = RateLimitedWorkflow.builder()
+            .workflow(callExternalApiWorkflow)
+            .rateLimitStrategy(limiter)
+            .build();
 
-// Execute - automatically rate limited
-for (int i = 0; i < 100; i++) {
-    apiWorkflow.execute(context); // First 50 succeed, rest wait for refill
+    // Execute - automatically rate limited
+    for (int i = 0; i < 100; i++) {
+        apiWorkflow.execute(context); // First 50 succeed, rest wait for refill
+    }
 }
 ```
 
@@ -1220,15 +1222,23 @@ RateLimitStrategy limiter = new TokenBucketRateLimiter(1000, Duration.ofSeconds(
 
 The Workflow Engine provides comprehensive rate limiting support:
 
-1. **Four Strategies**: Fixed Window, Sliding Window, Token Bucket, Leaky Bucket
+1. **Six Strategies**: Fixed Window, Sliding Window, Token Bucket, Leaky Bucket, Resilience4j, Bucket4j
 2. **Flexible Integration**: Works with any workflow
 3. **Thread-Safe**: All implementations are thread-safe
-4. **Shared Limiters**: Support for shared rate limits
-5. **Non-Blocking Options**: tryAcquire() variants
-6. **Easy to Test**: Mockable and resettable
+4. **Production Ready**: Resilience4j and Bucket4j for production use
+5. **Non-Blocking Options**: tryAcquire() variants for all strategies
+
+### Strategy Selection Guide
 
 Choose the right strategy based on your requirements:
-- **Simple needs** → Fixed Window
-- **Accuracy** → Sliding Window
-- **Bursts** → Token Bucket
-- **Steady rate** → Leaky Bucket
+
+| Requirement              | Recommended Strategy           |
+|--------------------------|--------------------------------|
+| Simple API rate limits   | Fixed Window                   |
+| Accurate rate limiting   | Sliding Window or Bucket4j     |
+| Burst tolerance          | Token Bucket or Bucket4j       |
+| Steady output rate       | Leaky Bucket                   |
+| Production deployment    | **Resilience4j or Bucket4j**   |
+| Highest performance      | **Bucket4j**                   |
+| Observability needed     | **Resilience4j**               |
+| Distributed systems      | Resilience4j or Bucket4j       |
