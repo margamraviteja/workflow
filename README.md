@@ -37,6 +37,7 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 
 ### 🔧 **Rich Task Library**
 - HTTP tasks (GET, POST, PUT, DELETE)
+- JDBC database operations (Query, Update, Batch)
 - File I/O operations
 - Shell command execution
 - Conditional execution
@@ -46,7 +47,7 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 - Retry policies (fixed, exponential backoff, jitter)
 - Timeout policies
 - Fallback workflows
-- Rate limiting (fixed window, sliding window, token bucket, leaky bucket)
+- Rate limiting (fixed window, sliding window, token bucket, leaky bucket, Resilience4j, Bucket4j)
 
 ### 📊 **Observability**
 - Workflow lifecycle listeners
@@ -59,11 +60,19 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 - Spring Boot auto-configuration
 - Dependency injection support
 
+## Prerequisites
+
+- **Java 25 or higher** (Required)
+- **Maven 3.9+** for dependency management
+
 ## Quick Start
 
 ### Simple Sequential Workflow
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.*;
 import java.nio.file.Path;
 
 public class MyWorkflowApp {
@@ -93,30 +102,114 @@ public class MyWorkflowApp {
 ### Parallel Workflow with HTTP Tasks
 
 ```java
-Workflow parallelWorkflow = ParallelWorkflow.builder()
-        .name("DataAggregation")
-        .task(new GetTask("https://api.example.com/users", "usersData"))
-        .task(new GetTask("https://api.example.com/orders", "ordersData"))
-        .task(new GetTask("https://api.example.com/products", "productsData"))
-        .failFast(true)
-        .build();
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.GetTask;
+import java.net.http.HttpClient;
 
-WorkflowContext context = new WorkflowContext();
-WorkflowResult result = parallelWorkflow.execute(context);
+public class ApiAggregator {
+    public void aggregateData() {
+        HttpClient client = HttpClient.newHttpClient();
+        
+        Workflow parallelWorkflow = ParallelWorkflow.builder()
+                .name("DataAggregation")
+                .task(new GetTask.Builder<>(client)
+                        .url("https://api.example.com/users")
+                        .responseContextKey("usersData")
+                        .build())
+                .task(new GetTask.Builder<>(client)
+                        .url("https://api.example.com/orders")
+                        .responseContextKey("ordersData")
+                        .build())
+                .task(new GetTask.Builder<>(client)
+                        .url("https://api.example.com/products")
+                        .responseContextKey("productsData")
+                        .build())
+                .failFast(true)
+                .build();
+
+        WorkflowContext context = new WorkflowContext();
+        WorkflowResult result = parallelWorkflow.execute(context);
+    }
+}
 ```
 
 ### Conditional Workflow
 
 ```java
-Workflow conditionalWorkflow = ConditionalWorkflow.builder()
-        .name("OrderProcessing")
-        .condition(context -> {
-            Integer amount = context.getTyped("orderAmount", Integer.class);
-            return amount != null && amount > 1000;
-        })
-        .whenTrue(expensiveOrderWorkflow)
-        .whenFalse(standardOrderWorkflow)
-        .build();
+public class OrderProcessor {
+    public Workflow buildOrderWorkflow(Workflow expensiveFlow, Workflow standardFlow) {
+        return ConditionalWorkflow.builder()
+                .name("OrderProcessing")
+                .condition(context -> {
+                    Integer amount = context.getTyped("orderAmount", Integer.class);
+                    return amount != null && amount > 1000;
+                })
+                .whenTrue(expensiveFlow)
+                .whenFalse(standardFlow)
+                .build();
+    }
+}
+```
+
+### JDBC Database Operations
+
+```java
+import com.workflow.*;
+import com.workflow.task.*;
+import com.workflow.context.WorkflowContext;
+import javax.sql.DataSource;
+import java.util.*;
+
+public class DatabaseWorkflowExample {
+    public void runDatabaseWorkflow() {
+        DataSource dataSource = createDataSource(); // Your connection pool
+        
+        // Query task
+        JdbcQueryTask queryTask = JdbcQueryTask.builder()
+                .dataSource(dataSource)
+                .readingSqlFrom("sql")
+                .readingParamsFrom("params")
+                .writingResultsTo("results")
+                .build();
+        
+        // Update task
+        JdbcUpdateTask updateTask = JdbcUpdateTask.builder()
+                .dataSource(dataSource)
+                .readingSqlFrom("updateSql")
+                .readingParamsFrom("updateParams")
+                .writingRowsAffectedTo("rowsAffected")
+                .build();
+        
+        // Build workflow
+        Workflow workflow = SequentialWorkflow.builder()
+                .name("UserDataPipeline")
+                .task(context -> {
+                    context.put("sql", "SELECT * FROM users WHERE status = ?");
+                    context.put("params", List.of("ACTIVE"));
+                })
+                .task(queryTask)
+                .task(context -> {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> users = 
+                        (List<Map<String, Object>>) context.get("results");
+                    // Process users...
+                    Integer userId = (Integer) users.getFirst().get("id");
+                    context.put("updateSql", "UPDATE users SET last_login = NOW() WHERE id = ?");
+                    context.put("updateParams", Collections.singletonList(userId));
+                })
+                .task(updateTask)
+                .build();
+        
+        WorkflowContext context = new WorkflowContext();
+        workflow.execute(context);
+    }
+    
+    private DataSource createDataSource() {
+        // Implementation using HikariCP or other connection pool
+        return null; // Placeholder
+    }
+}
 ```
 
 ### JavaScript Workflow
@@ -124,14 +217,19 @@ Workflow conditionalWorkflow = ConditionalWorkflow.builder()
 ```java
 import com.workflow.JavascriptWorkflow;
 import com.workflow.script.FileScriptProvider;
+import com.workflow.context.WorkflowContext;
+import org.graalvm.polyglot.Context;
 import java.nio.file.Path;
 
 public class JavaScriptExample {
-    static void main(String[] args) {
+    public void runJavaScriptWorkflow() {
         // Create workflow from JavaScript file
         Workflow workflow = JavascriptWorkflow.builder()
             .name("DynamicPricing")
             .scriptProvider(new FileScriptProvider(Path.of("rules/pricing.js")))
+            .context(Context.newBuilder("js")
+                    .allowAllAccess(false)
+                    .build())
             .build();
 
         WorkflowContext context = new WorkflowContext();
@@ -141,6 +239,7 @@ public class JavaScriptExample {
         workflow.execute(context);
         
         Double finalPrice = context.getTyped("finalPrice", Double.class);
+        System.out.println("Final price: " + finalPrice);
     }
 }
 ```
@@ -172,44 +271,77 @@ ctx.put('finalPrice', final);
 ### With Retry and Timeout
 
 ```java
-TaskDescriptor taskWithPolicies = TaskDescriptor.builder()
-        .task(new PostTask("https://api.example.com/process", "requestBody", "response"))
-        .retryPolicy(RetryPolicy.exponentialBackoff(3, 1000))
-        .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
-        .build();
+import com.workflow.policy.*;
+import com.workflow.task.*;
+import java.net.http.HttpClient;
 
-Workflow workflow = new TaskWorkflow(taskWithPolicies);
+public class ResilientWorkflowExample {
+    public Workflow buildResilientTask(HttpClient client) {
+        TaskDescriptor taskWithPolicies = TaskDescriptor.builder()
+                .task(new PostTask.Builder<>(client)
+                        .url("https://api.example.com/process")
+                        .build())
+                .retryPolicy(RetryPolicy.exponentialBackoff(3, 1000))
+                .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
+                .build();
+
+        return new TaskWorkflow(taskWithPolicies);
+    }
+}
 ```
 
 ### With Rate Limiting
 
 ```java
-// Limit API calls to 100 per minute
-RateLimitStrategy limiter = new FixedWindowRateLimiter(100, Duration.ofMinutes(1));
+import com.workflow.ratelimit.*;
+import java.time.Duration;
 
-Workflow rateLimited = RateLimitedWorkflow.builder()
-        .workflow(apiWorkflow)
-        .rateLimitStrategy(limiter)
-        .build();
+public class RateLimitedApiExample {
+    public Workflow buildRateLimitedWorkflow(Workflow apiWorkflow) {
+        // Limit API calls to 100 per minute
+        RateLimitStrategy limiter = new FixedWindowRateLimiter(100, Duration.ofMinutes(1));
 
-// Or use Token Bucket for burst support
-RateLimitStrategy tokenBucket = new TokenBucketRateLimiter(
-        100,                        // 100 requests per second
-        200,                        // Burst capacity of 200
-        Duration.ofSeconds(1)
-);
+        return RateLimitedWorkflow.builder()
+                .name("RateLimitedAPI")
+                .workflow(apiWorkflow)
+                .rateLimitStrategy(limiter)
+                .build();
+    }
+    
+    public Workflow buildTokenBucketWorkflow(Workflow apiWorkflow) {
+        // Token Bucket for burst support
+        RateLimitStrategy tokenBucket = new TokenBucketRateLimiter(
+                100,                        // 100 requests per second
+                200,                        // Burst capacity of 200
+                Duration.ofSeconds(1)
+        );
 
-// Or use Resilience4j for production-ready rate limiting
-RateLimitStrategy resilience4j = new Resilience4jRateLimiter(
-        100,                        // 100 requests per second
-        Duration.ofSeconds(1)       // Refresh period
-);
+        return RateLimitedWorkflow.builder()
+                .workflow(apiWorkflow)
+                .rateLimitStrategy(tokenBucket)
+                .build();
+    }
+    
+    public Workflow buildResilience4jWorkflow(Workflow apiWorkflow) {
+        // Resilience4j for production-ready rate limiting
+        RateLimitStrategy resilience4j = new Resilience4jRateLimiter(
+                100,                        // 100 requests per second
+                Duration.ofSeconds(1)       // Refresh period
+        );
+
+        return RateLimitedWorkflow.builder()
+                .workflow(apiWorkflow)
+                .rateLimitStrategy(resilience4j)
+                .build();
+    }
+}
 ```
 
 ### With Workflow Listeners
 
 ```java
 import lombok.extern.slf4j.Slf4j;
+import com.workflow.listener.*;
 
 @Slf4j
 public class WorkflowRunner {
@@ -245,12 +377,14 @@ public class WorkflowRunner {
 
 ```java
 public class MyWorkflowApp {
-    static void main(String[] args) {
+    public void visualizeWorkflow(Workflow step1, Workflow step2a, 
+                                  Workflow step2b, Workflow step3) {
         // Visualize workflow hierarchy
         Workflow workflow = SequentialWorkflow.builder()
                 .name("ComplexPipeline")
                 .workflow(step1)
                 .workflow(ParallelWorkflow.builder()
+                        .name("ParallelTasks")
                         .workflow(step2a)
                         .workflow(step2b)
                         .build())
@@ -395,7 +529,7 @@ public class WorkflowSecurity {
 
 ## Built-in Tasks
 
-The framework provides a rich set of pre-built tasks:
+The framework provides a rich set of pre-built tasks. For complete documentation, see [TASKS.md](docs/TASKS.md).
 
 ### HTTP Tasks
 - `GetTask` - HTTP GET requests
@@ -406,6 +540,15 @@ The framework provides a rich set of pre-built tasks:
 ### File Tasks
 - `FileReadTask` - Read file contents
 - `FileWriteTask` - Write data to files
+
+### Database Tasks
+- `JdbcQueryTask` - Execute SQL SELECT queries
+- `JdbcUpdateTask` - Execute SQL INSERT/UPDATE/DELETE statements
+- `JdbcBatchUpdateTask` - Execute batch SQL updates
+- `JdbcTypedQueryTask` - Type-safe query results
+- `JdbcStreamingQueryTask` - Stream large result sets
+- `JdbcCallableTask` - Execute stored procedures
+- `JdbcTransactionTask` - Transactional task execution
 
 ### Control Flow Tasks
 - `ConditionalTask` - Conditional execution
@@ -425,65 +568,85 @@ The framework provides a rich set of pre-built tasks:
 
 ## Rate Limiting Strategies
 
-The framework provides six rate limiting algorithms:
+The framework provides six rate limiting algorithms. For complete documentation, see [RATE_LIMITING.md](docs/RATE_LIMITING.md).
 
 ### Fixed Window
 Simple time-window based limiting. Best for basic use cases.
 
 ```java
-RateLimitStrategy limiter = new FixedWindowRateLimiter(100, Duration.ofMinutes(1));
+public class RateLimitExample {
+    public RateLimitStrategy createFixedWindow() {
+        return new FixedWindowRateLimiter(100, Duration.ofMinutes(1));
+    }
+}
 ```
 
 ### Sliding Window
 Accurate rate limiting with no boundary effects. Best for strict rate limiting.
 
 ```java
-RateLimitStrategy limiter = new SlidingWindowRateLimiter(100, Duration.ofMinutes(1));
+public class RateLimitExample {
+    public RateLimitStrategy createSlidingWindow() {
+        return new SlidingWindowRateLimiter(100, Duration.ofMinutes(1));
+    }
+}
 ```
 
 ### Token Bucket
 Allows controlled bursts while maintaining average rate. Best for APIs that support bursts.
 
 ```java
-RateLimitStrategy limiter = new TokenBucketRateLimiter(
-        100,                        // Tokens per second
-        200,                        // Burst capacity
-        Duration.ofSeconds(1)
-);
+public class RateLimitExample {
+    public RateLimitStrategy createTokenBucket() {
+        return new TokenBucketRateLimiter(
+                100,                        // Tokens per second
+                200,                        // Burst capacity
+                Duration.ofSeconds(1)
+        );
+    }
+}
 ```
 
 ### Leaky Bucket
 Ensures constant output rate. Best for steady-state processing.
 
 ```java
-RateLimitStrategy limiter = new LeakyBucketRateLimiter(
-        100,                        // Requests per second
-        Duration.ofSeconds(1)
-);
+public class RateLimitExample {
+    public RateLimitStrategy createLeakyBucket() {
+        return new LeakyBucketRateLimiter(
+                100,                        // Requests per second
+                Duration.ofSeconds(1)
+        );
+    }
+}
 ```
 
 ### Resilience4j Rate Limiter
-Production-ready rate limiting using the Resilience4j library. Best for production applications requiring battle-tested implementation, observability, and integration with existing Resilience4j setup.
+Production-ready rate limiting using the Resilience4j library.
 
 ```java
-// Basic usage
-RateLimitStrategy limiter = new Resilience4jRateLimiter(
+import io.github.resilience4j.ratelimiter.*;
+
+public class RateLimitExample {
+    public RateLimitStrategy createResilience4j() {
+        // Basic usage
+        return new Resilience4jRateLimiter(
                 100,                        // Requests per second
                 Duration.ofSeconds(1)       // Refresh period
         );
+    }
+    
+    public RateLimitStrategy createCustomResilience4j() {
+        // With custom configuration
+        RateLimiterConfig config = RateLimiterConfig.custom()
+                .limitForPeriod(100)
+                .limitRefreshPeriod(Duration.ofSeconds(1))
+                .timeoutDuration(Duration.ofSeconds(5))
+                .build();
 
-// With custom configuration
-RateLimiterConfig config = RateLimiterConfig.custom()
-        .limitForPeriod(100)
-        .limitRefreshPeriod(Duration.ofSeconds(1))
-        .timeoutDuration(Duration.ofSeconds(5))
-        .build();
-
-RateLimitStrategy limiter = new Resilience4jRateLimiter("myAPI", config);
-
-// Integration with existing Resilience4j setup
-RateLimiter existingLimiter = RateLimiter.of("appLimiter", config);
-RateLimitStrategy limiter = new Resilience4jRateLimiter(existingLimiter);
+        return new Resilience4jRateLimiter("myAPI", config);
+    }
+}
 ```
 
 **Features:**
@@ -494,30 +657,30 @@ RateLimitStrategy limiter = new Resilience4jRateLimiter(existingLimiter);
 - Supports dynamic configuration
 
 ### Bucket4j Rate Limiter
-High-performance rate limiting using the Bucket4j library based on token bucket algorithm. Best for high-throughput applications requiring minimal overhead and flexible burst capacity.
+High-performance rate limiting using the Bucket4j library.
 
 ```java
-// Basic usage
-RateLimitStrategy limiter = new Bucket4jRateLimiter(
+import io.github.bucket4j.*;
+
+public class RateLimitExample {
+    public RateLimitStrategy createBucket4j() {
+        // Basic usage
+        return new Bucket4jRateLimiter(
                 100,                        // Capacity
                 Duration.ofSeconds(1)       // Refill period
         );
-
-// With burst capacity
-RateLimitStrategy limiter = new Bucket4jRateLimiter(
-        200,                        // Burst capacity
-        100,                        // Refill tokens per period
-        Duration.ofSeconds(1),      // Refill period
-        Bucket4jRateLimiter.RefillStrategy.GREEDY
-);
-
-// With custom bandwidth
-Bandwidth bandwidth = Bandwidth.builder()
-        .capacity(100)
-        .refillGreedy(100, Duration.ofSeconds(1))
-        .build();
-
-RateLimitStrategy limiter = new Bucket4jRateLimiter(bandwidth);
+    }
+    
+    public RateLimitStrategy createBucket4jWithBurst() {
+        // With burst capacity
+        return new Bucket4jRateLimiter(
+                200,                        // Burst capacity
+                100,                        // Refill tokens per period
+                Duration.ofSeconds(1),      // Refill period
+                Bucket4jRateLimiter.RefillStrategy.GREEDY
+        );
+    }
+}
 ```
 
 **Features:**
@@ -570,7 +733,7 @@ public class WorkflowConfig {
 
 ## Database Configuration
 
-Configure workflows dynamically from database:
+Configure workflows dynamically from database. For complete documentation, see [DATABASE_CONFIGURATION.md](docs/DATABASE_CONFIGURATION.md).
 
 ```sql
 -- Define workflow
@@ -579,17 +742,19 @@ VALUES ('DataPipeline', 'Data processing pipeline', FALSE);
 
 -- Define workflow steps
 INSERT INTO workflow_steps (workflow_id, name, instance_name, order_index) VALUES
-                                                                               (1, 'Extract', 'ExtractWorkflow', 1),
-                                                                               (1, 'Transform', 'TransformWorkflow', 2),
-                                                                               (1, 'Load', 'LoadWorkflow', 3);
+    (1, 'Extract', 'ExtractWorkflow', 1),
+    (1, 'Transform', 'TransformWorkflow', 2),
+    (1, 'Load', 'LoadWorkflow', 3);
 ```
 
 ```java
-DatabaseWorkflowProcessor processor = new DatabaseWorkflowProcessor(dataSource, registry);
-Workflow workflow = processor.buildWorkflow("DataPipeline");
+public class DatabaseWorkflowExample {
+    public Workflow loadFromDatabase(DataSource dataSource, WorkflowRegistry registry) {
+        DatabaseWorkflowProcessor processor = new DatabaseWorkflowProcessor(dataSource, registry);
+        return processor.buildWorkflow("DataPipeline");
+    }
+}
 ```
-
-See [DATABASE_CONFIGURATION.md](docs/DATABASE_CONFIGURATION.md) for complete documentation.
 
 ## Retry Policies
 
@@ -648,9 +813,11 @@ Thread-safe, type-safe context for data flow:
 
 ```java
 import java.util.List;
+import com.workflow.context.*;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 public class WorkflowDataHandler {
-    // 1. Constants (TypedKeys) can be declared at the class level
+    // Constants (TypedKeys) can be declared at the class level
     private static final TypedKey<List<Order>> ORDERS = TypedKey.of("orders", List.class);
 
     public void manageContextData() {
@@ -672,7 +839,7 @@ public class WorkflowDataHandler {
         // 5. Generic type support with TypeReference
         List<User> users = List.of(new User("Alice"), new User("Bob"));
         context.put("users", users);
-        List<User> retrieved = context.getTyped("users", new TypeReference<List<User>>() {});
+        List<User> retrieved = context.getTyped("users", new TypeReference<>() {});
 
         // 6. Scoped contexts (namespace isolation)
         WorkflowContext userScope = context.scope("user");
@@ -685,12 +852,13 @@ public class WorkflowDataHandler {
 
 ### Thread Pool Strategy (Default)
 ```java
+import com.workflow.execution.strategy.*;
+
 public class WorkflowConfiguration {
     public Workflow buildManagedParallelWorkflow(Workflow taskA, Workflow taskB) {
-        // 1. Define the execution strategy (e.g., using a thread pool)
         ExecutionStrategy strategy = new ThreadPoolExecutionStrategy();
 
-        // 2. Build the workflow using that strategy
+        // Build the workflow using that strategy
         return ParallelWorkflow.builder()
                 .name("AsyncDataProcessor")
                 .executionStrategy(strategy) // Use the custom strategy
@@ -703,12 +871,13 @@ public class WorkflowConfiguration {
 
 ### Reactive Strategy (Project Reactor)
 ```java
+import com.workflow.execution.strategy.*;
+
 public class ReactiveWorkflowConfig {
     public Workflow buildReactiveParallelWorkflow(Workflow task1, Workflow task2) {
-        // 1. Define the strategy (must be inside a method)
         ExecutionStrategy strategy = new ReactorExecutionStrategy();
 
-        // 2. Build the workflow
+        // Build the workflow
         return ParallelWorkflow.builder()
                 .name("ReactiveDataPipeline")
                 .executionStrategy(strategy)
@@ -721,10 +890,11 @@ public class ReactiveWorkflowConfig {
 
 ## Workflow Listeners
 
-Add observability and custom actions without modifying workflow code:
+Add observability and custom actions without modifying workflow code. For complete documentation, see [WORKFLOW_LISTENERS.md](docs/WORKFLOW_LISTENERS.md).
 
 ```java
-// Create custom listener
+import com.workflow.listener.*;
+
 public class MetricsListener implements WorkflowListener {
     @Override
     public void onStart(String name, WorkflowContext ctx) {
@@ -751,34 +921,47 @@ public class WorkflowMonitoring {
 
 ## Helper Utilities
 
-The framework provides comprehensive utility classes to simplify common operations:
+The framework provides comprehensive utility classes to simplify common operations. For complete documentation, see [HELPERS.md](docs/HELPERS.md).
 
 ### Workflows Helper
 Factory methods for creating workflow builders:
 
 ```java
-// Concise workflow creation
-Workflow sequential = Workflows.sequential("MyWorkflow")
+import com.workflow.helper.Workflows;
+import com.workflow.task.Task;
+
+public class WorkflowFactory {
+    public Workflow createSequential(Task task1, Task task2) {
+        return Workflows.sequential("MyWorkflow")
                 .task(task1)
                 .task(task2)
                 .build();
+    }
 
-Workflow parallel = Workflows.parallel("ParallelTasks")
-        .workflow(workflow1)
-        .workflow(workflow2)
-        .build();
+    public Workflow createParallel(Workflow workflow1, Workflow workflow2) {
+        return Workflows.parallel("ParallelTasks")
+                .workflow(workflow1)
+                .workflow(workflow2)
+                .build();
+    }
+}
 ```
 
 ### ValidationUtils
 Comprehensive validation helpers:
 
 ```java
-public void validate(Workflow workflow, List<Task>  tasks, int retries, int timeout) {
-    // Validate required parameters
-    ValidationUtils.requireNonNull(workflow, "workflow");
-    ValidationUtils.requireNonEmpty(tasks, "task list");
-    ValidationUtils.requirePositive(timeout, "timeout");
-    ValidationUtils.requireInRange(retries, 0, 10, "retry count");
+import com.workflow.helper.ValidationUtils;
+import com.workflow.task.Task;
+import java.util.List;
+
+public class WorkflowValidator {
+    public void validate(Workflow workflow, List<Task> tasks, int retries, int timeout) {
+        ValidationUtils.requireNonNull(workflow, "workflow");
+        ValidationUtils.requireNonEmpty(tasks, "task list");
+        ValidationUtils.requirePositive(timeout, "timeout");
+        ValidationUtils.requireInRange(retries, 0, 10, "retry count");
+    }
 }
 ```
 
@@ -786,28 +969,36 @@ public void validate(Workflow workflow, List<Task>  tasks, int retries, int time
 HTTP response mapping utilities:
 
 ```java
-// Strict mapper with error checking
-var mapper = ResponseMappers.strictTypedMapper(User.class);
+import com.workflow.helper.ResponseMappers;
 
-// Default mapper for simple cases
-var defaultMapper = ResponseMappers.defaultResponseMapper();
-
-// Wrap in TaskExecutionException
-var wrapped = ResponseMappers.wrapToTaskException(customMapper);
+public class ResponseHandler {
+    public void handleResponses() {
+        var mapper = ResponseMappers.strictTypedMapper(User.class);
+        var defaultMapper = ResponseMappers.defaultResponseMapper();
+        var wrapped = ResponseMappers.wrapToTaskException(customMapper);
+    }
+}
 ```
 
 ### WorkflowResults
 Convenient result creation:
 
 ```java
-// Create success/failure results
-WorkflowResult success = WorkflowResults.success(startedAt, completedAt);
-WorkflowResult failure = WorkflowResults.failure(startedAt, completedAt, error);
+import com.workflow.helper.WorkflowResults;
+import java.time.Instant;
+
+public class ResultBuilder {
+    public WorkflowResult buildResults(Instant startedAt, Instant completedAt, Throwable error) {
+        WorkflowResult success = WorkflowResults.success(startedAt, completedAt);
+        WorkflowResult failure = WorkflowResults.failure(startedAt, completedAt, error);
+        return success;
+    }
+}
 ```
 
 ## Examples
 
-The framework includes comprehensive examples demonstrating various patterns:
+The framework includes comprehensive examples demonstrating various patterns in the `src/examples` directory:
 
 - **Order Processing**: E-commerce order workflow with validation, payment, and fulfillment
 - **Data Pipeline**: ETL workflow with extraction, transformation, and loading
@@ -823,8 +1014,6 @@ The framework includes comprehensive examples demonstrating various patterns:
 - **Fan-Out/Fan-In**: Parallel task execution with result aggregation
 - **State Machine**: Complex state transitions and conditional flows
 
-See the `src/examples` directory for complete implementations.
-
 ## Documentation
 
 - [Architecture Overview](docs/ARCHITECTURE.md) - System design and component relationships
@@ -835,13 +1024,6 @@ See the `src/examples` directory for complete implementations.
 - [Rate Limiting Guide](docs/RATE_LIMITING.md) - Rate limiting strategies and usage
 - [Workflow Listeners Guide](docs/WORKFLOW_LISTENERS.md) - Event-driven monitoring
 - [Database Configuration](docs/DATABASE_CONFIGURATION.md) - Database-based workflow configuration
-
-## Requirements
-
-- Java 25+
-- Maven 3.9+
-- Project Reactor (for reactive execution strategy)
-- Optional: Spring Framework 6.2+ (for annotation processing)
 
 ## Building
 

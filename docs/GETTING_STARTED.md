@@ -14,8 +14,8 @@ This guide will help you get up and running with the Workflow Engine in minutes.
 
 Before you begin, ensure you have:
 
-- **Java 25 or higher** installed
-- **Maven 3.9+** for dependency management
+- **Java 25 or higher** installed (Required)
+- **Maven 3.9+** for dependency management (Required)
 - Basic understanding of Java and functional programming concepts
 
 ### Optional Dependencies
@@ -99,13 +99,18 @@ Duration: 0.015 seconds
 ### Pattern 1: Data Processing Pipeline
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.Task;
+import com.workflow.exception.TaskExecutionException;
+
 public class DataPipelineRunner {
     public void runProcess() {
-        // 1. Define processing tasks (Must be inside a method)
+        // Define processing tasks
         Task validateTask = context -> {
             String data = context.getTyped("rawData", String.class);
             if (data == null || data.isEmpty()) {
-                throw new RuntimeException("Data is required"); // or TaskExecutionException
+                throw new TaskExecutionException("Data is required");
             }
             context.put("validData", data);
         };
@@ -122,7 +127,7 @@ public class DataPipelineRunner {
             context.put("saved", true);
         };
 
-        // 2. Create pipeline
+        // Create pipeline
         Workflow pipeline = SequentialWorkflow.builder()
                 .name("DataPipeline")
                 .task(validateTask)
@@ -130,7 +135,7 @@ public class DataPipelineRunner {
                 .task(saveTask)
                 .build();
 
-        // 3. Execute
+        // Execute
         WorkflowContext context = new WorkflowContext();
         context.put("rawData", "hello world");
         WorkflowResult result = pipeline.execute(context);
@@ -143,16 +148,16 @@ public class DataPipelineRunner {
 ### Pattern 2: Parallel API Calls
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
 import com.workflow.task.GetTask;
 import java.net.http.HttpClient;
-import java.util.List;
 
 public class UserDataService {
     public void fetchUserDataParallel() {
-        // 1. Initialize the client inside the method
         HttpClient client = HttpClient.newHttpClient();
 
-        // 2. Define the parallel workflow
+        // Define the parallel workflow
         Workflow parallelFetch = ParallelWorkflow.builder()
                 .name("FetchUserData")
                 .task(new GetTask.Builder<>(client)
@@ -169,11 +174,11 @@ public class UserDataService {
                         .build())
                 .build();
 
-        // 3. Execute
+        // Execute
         WorkflowContext context = new WorkflowContext();
         WorkflowResult result = parallelFetch.execute(context);
 
-        // 4. Extract results from context
+        // Extract results from context
         if (result.isSuccess()) {
             String userData = context.getTyped("userData", String.class);
             String ordersData = context.getTyped("ordersData", String.class);
@@ -188,9 +193,12 @@ public class UserDataService {
 ### Pattern 3: Conditional Processing
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+
 public class UserWorkflowFactory {
     public WorkflowResult processUser(String userType) {
-        // 1. Build the conditional logic (Must be inside a method)
+        // Build the conditional logic
         Workflow conditionalWorkflow = ConditionalWorkflow.builder()
                 .name("UserTypeProcessor")
                 .condition(ctx -> {
@@ -198,17 +206,19 @@ public class UserWorkflowFactory {
                     return "premium".equals(type);
                 })
                 .whenTrue(SequentialWorkflow.builder()
+                        .name("PremiumFlow")
                         .task(new PremiumValidationTask())
                         .task(new PremiumProcessingTask())
                         .task(new PremiumRewardsTask())
                         .build())
                 .whenFalse(SequentialWorkflow.builder()
+                        .name("StandardFlow")
                         .task(new StandardValidationTask())
                         .task(new StandardProcessingTask())
                         .build())
                 .build();
 
-        // 2. Prepare context and execute
+        // Prepare context and execute
         WorkflowContext context = new WorkflowContext();
         context.put("userType", userType);
 
@@ -220,43 +230,63 @@ public class UserWorkflowFactory {
 ### Pattern 4: Retry with Timeout
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
 import com.workflow.task.TaskDescriptor;
 import com.workflow.policy.*;
 
-TaskDescriptor resilientTask = TaskDescriptor.builder()
-    .task(new ApiCallTask())
-    .retryPolicy(RetryPolicy.exponentialBackoff(
-        3,      // 3 retries
-        1000    // Starting at 1 second
-    ))
-    .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
-    .build();
+public class ResilientTaskExample {
+    public WorkflowResult executeWithRetry(WorkflowContext context) {
+        TaskDescriptor resilientTask = TaskDescriptor.builder()
+                .task(new ApiCallTask())
+                .retryPolicy(RetryPolicy.exponentialBackoff(
+                        3,      // 3 retries
+                        1000    // Starting at 1 second
+                ))
+                .timeoutPolicy(TimeoutPolicy.ofSeconds(30))
+                .build();
 
-Workflow workflow = new TaskWorkflow(resilientTask);
-WorkflowResult result = workflow.execute(context);
+        Workflow workflow = new TaskWorkflow(resilientTask);
+        return workflow.execute(context);
+    }
+}
 ```
 
 ### Pattern 5: Fallback on Failure
 
 ```java
-Workflow withFallback = FallbackWorkflow.builder()
-    .name("DataRetrieval")
-    .primary(SequentialWorkflow.builder()
-        .task(new GetTask.Builder<>(client)
-            .url("https://api.example.com/data")
-            .responseContextKey("data")
-            .build())
-        .build())
-    .fallback(SequentialWorkflow.builder()
-        .task(new FileReadTask(
-            Path.of("cache/data.json"),
-            "data"
-        ))
-        .build())
-    .build();
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.*;
+import java.net.http.HttpClient;
+import java.nio.file.Path;
 
-// If API fails, reads from cache
-WorkflowResult result = withFallback.execute(context);
+public class FallbackExample {
+    public WorkflowResult fetchDataWithFallback(WorkflowContext context) {
+        HttpClient client = HttpClient.newHttpClient();
+        
+        Workflow withFallback = FallbackWorkflow.builder()
+                .name("DataRetrieval")
+                .primary(SequentialWorkflow.builder()
+                        .name("APIRetrieval")
+                        .task(new GetTask.Builder<>(client)
+                                .url("https://api.example.com/data")
+                                .responseContextKey("data")
+                                .build())
+                        .build())
+                .fallback(SequentialWorkflow.builder()
+                        .name("CacheRetrieval")
+                        .task(new FileReadTask(
+                                Path.of("cache/data.json"),
+                                "data"
+                        ))
+                        .build())
+                .build();
+
+        // If API fails, reads from cache
+        return withFallback.execute(context);
+    }
+}
 ```
 
 ## Configuration Options
@@ -264,14 +294,15 @@ WorkflowResult result = withFallback.execute(context);
 ### Context Management
 
 ```java
+import com.workflow.context.*;
 import java.util.Optional;
 
 public class WorkflowDataProcessor {
-    // 1. Declare Type-safe keys as constants at the class level
+    // Declare Type-safe keys as constants at the class level
     private static final TypedKey<User> USER_KEY = TypedKey.of("user", User.class);
 
     public void handleContext(User user) {
-        // 2. All logic must reside inside a method
+        // All logic must reside inside a method
         WorkflowContext context = new WorkflowContext();
 
         // Basic operations
@@ -284,7 +315,7 @@ public class WorkflowDataProcessor {
 
         // Scoped contexts (Namespace isolation)
         WorkflowContext userScope = context.scope("user");
-        userScope.put("id", 123);  // Internally stored in 'context' as "user.id"
+        userScope.put("id", 123);  // Stored as "user.id" in main context
     }
 }
 ```
@@ -292,14 +323,16 @@ public class WorkflowDataProcessor {
 ### Execution Strategies
 
 ```java
+import com.workflow.*;
+import com.workflow.execution.strategy.*;
+
 public class WorkflowEngineConfig {
-
+    // Define strategies
+    private ExecutionStrategy threadPool = new ThreadPoolExecutionStrategy();
+    private ExecutionStrategy reactive = new ReactorExecutionStrategy();
+    
     public Workflow buildParallelProcess(Workflow workflow1, Workflow workflow2) {
-        // 1. Define strategies inside the method
-        ExecutionStrategy threadPool = new ThreadPoolExecutionStrategy();
-        ExecutionStrategy reactive = new ReactorExecutionStrategy();
-
-        // 2. Build and return the workflow
+        // Build and return the workflow
         return ParallelWorkflow.builder()
                 .name("HybridExecutionWorkflow")
                 .executionStrategy(reactive) // Choosing the Reactive strategy here
@@ -313,24 +346,32 @@ public class WorkflowEngineConfig {
 ### Rate Limiting
 
 ```java
-// Fixed window: 100 requests per minute
-RateLimitStrategy limiter = new FixedWindowRateLimiter(
-    100, 
-    Duration.ofMinutes(1)
-);
+import com.workflow.*;
+import com.workflow.ratelimit.*;
+import java.time.Duration;
 
-// Token bucket: 100/sec with burst of 200
-RateLimitStrategy tokenBucket = new TokenBucketRateLimiter(
-    100,    // Rate
-    200,    // Burst capacity
-    Duration.ofSeconds(1)
-);
+public class RateLimitConfig {
+    public Workflow buildRateLimitedWorkflow(Workflow apiWorkflow) {
+        // Fixed window: 100 requests per minute
+        RateLimitStrategy limiter = new FixedWindowRateLimiter(
+                100, 
+                Duration.ofMinutes(1)
+        );
 
-// Apply to workflow
-Workflow rateLimited = RateLimitedWorkflow.builder()
-    .workflow(apiWorkflow)
-    .rateLimitStrategy(limiter)
-    .build();
+        // Token bucket: 100/sec with burst of 200
+        RateLimitStrategy tokenBucket = new TokenBucketRateLimiter(
+                100,    // Rate
+                200,    // Burst capacity
+                Duration.ofSeconds(1)
+        );
+
+        // Apply to workflow
+        return RateLimitedWorkflow.builder()
+                .workflow(apiWorkflow)
+                .rateLimitStrategy(limiter)
+                .build();
+    }
+}
 ```
 
 ### Pattern 6: Timeout Workflow
@@ -338,21 +379,27 @@ Workflow rateLimited = RateLimitedWorkflow.builder()
 Add time constraints to workflow execution:
 
 ```java
-public void example() {
-    // Create workflow with timeout
-    Workflow timedWorkflow = TimeoutWorkflow.builder()
-            .name("TimedAPICall")
-            .workflow(apiWorkflow)
-            .timeoutMs(30000)  // 30 second timeout
-            .build();
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.exception.TaskTimeoutException;
 
-    WorkflowContext context = new WorkflowContext();
-    WorkflowResult result = timedWorkflow.execute(context);
+public class TimeoutExample {
+    public void executeWithTimeout(Workflow apiWorkflow) {
+        // Create workflow with timeout
+        Workflow timedWorkflow = TimeoutWorkflow.builder()
+                .name("TimedAPICall")
+                .workflow(apiWorkflow)
+                .timeoutMs(30000)  // 30 second timeout
+                .build();
 
-    // Check for timeout
-    if (result.getStatus() == WorkflowStatus.FAILED &&
-            result.getError() instanceof TaskTimeoutException) {
-        System.err.println("Workflow timed out");
+        WorkflowContext context = new WorkflowContext();
+        WorkflowResult result = timedWorkflow.execute(context);
+
+        // Check for timeout
+        if (result.getStatus() == WorkflowStatus.FAILED &&
+                result.getError() instanceof TaskTimeoutException) {
+            System.err.println("Workflow timed out");
+        }
     }
 }
 ```
@@ -424,21 +471,25 @@ Now that you've created your first workflow, explore these topics:
 ### How do I handle errors?
 
 ```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.Task;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class WorkflowRunner {
     public void runProcess(Task task1, Task task2, WorkflowContext context) {
-        // 1. Build the workflow
+        // Build the workflow
         Workflow workflow = SequentialWorkflow.builder()
+                .name("ProcessWorkflow")
                 .task(task1)
                 .task(task2)
                 .build();
 
-        // 2. Execute and capture the result
+        // Execute and capture the result
         WorkflowResult result = workflow.execute(context);
 
-        // 3. Handle the lifecycle outcome
+        // Handle the lifecycle outcome
         if (result.isFailure()) {
             Throwable error = result.getError();
             // Handle error logic (e.g., rollback or notification)
@@ -455,15 +506,15 @@ public class WorkflowRunner {
 Tasks communicate through the shared `WorkflowContext`:
 
 ```java
+import com.workflow.context.WorkflowContext;
+
 public class UserWorkflow {
     public void executeWorkflow() {
         WorkflowContext context = new WorkflowContext();
 
-        // --- Task 1 Execution ---
         // Task 1 writes data to the shared context
         context.put("userId", 123);
 
-        // --- Task 2 Execution ---
         // Task 2 reads that same data using the unique key
         Integer userId = context.getTyped("userId", Integer.class);
 
@@ -477,14 +528,26 @@ public class UserWorkflow {
 Yes! Workflows are reusable. Create once, execute multiple times:
 
 ```java
-Workflow reusableWorkflow = SequentialWorkflow.builder()
-    .task(task1)
-    .task(task2)
-    .build();
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.Task;
 
-// Execute multiple times with different contexts
-WorkflowResult result1 = reusableWorkflow.execute(context1);
-WorkflowResult result2 = reusableWorkflow.execute(context2);
+public class WorkflowReuse {
+    public void demonstrateReuse(Task task1, Task task2) {
+        Workflow reusableWorkflow = SequentialWorkflow.builder()
+                .name("ReusableWorkflow")
+                .task(task1)
+                .task(task2)
+                .build();
+
+        // Execute multiple times with different contexts
+        WorkflowContext context1 = new WorkflowContext();
+        WorkflowContext context2 = new WorkflowContext();
+        
+        WorkflowResult result1 = reusableWorkflow.execute(context1);
+        WorkflowResult result2 = reusableWorkflow.execute(context2);
+    }
+}
 ```
 
 ### How do I debug workflows?
@@ -497,12 +560,12 @@ logger.com.workflow.level = DEBUG
 
 - Use workflow tree visualization:
 ```java
+import com.workflow.Workflow;
+
 public class WorkflowDebugger {
     public void visualizeWorkflow(Workflow workflow) {
-        // 1. Generate the string representation (Must be inside a method)
+        // Generate and print the tree representation
         String tree = workflow.toTreeString();
-
-        // 2. Print it to the console
         System.out.println(tree);
     }
 }

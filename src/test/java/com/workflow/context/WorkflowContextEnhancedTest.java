@@ -407,4 +407,118 @@ class WorkflowContextEnhancedTest {
       assertTrue(true);
     }
   }
+
+  // ==== Remove Method Tests ====
+
+  @Test
+  void remove_existingKey_returnsValueAndRemovesIt() {
+    context.put("key", "value");
+
+    Object result = context.remove("key");
+
+    assertEquals("value", result);
+    assertFalse(context.containsKey("key"));
+  }
+
+  @Test
+  void remove_missingKey_returnsNull() {
+    Object result = context.remove("missing");
+
+    assertNull(result);
+  }
+
+  @Test
+  void remove_afterRemoval_containsKeyReturnsFalse() {
+    context.put("key", "value");
+    context.remove("key");
+
+    assertFalse(context.containsKey("key"));
+  }
+
+  @Test
+  void remove_withType_returnsTypedValue() {
+    context.put("count", 42);
+
+    Integer result = context.remove("count", Integer.class);
+
+    assertEquals(42, result);
+    assertFalse(context.containsKey("count"));
+  }
+
+  @Test
+  void remove_withType_missingKey_returnsNull() {
+    Integer result = context.remove("missing", Integer.class);
+
+    assertNull(result);
+  }
+
+  @Test
+  void remove_withType_wrongType_throwsClassCastException() {
+    context.put("key", "string");
+
+    assertThrows(ClassCastException.class, () -> context.remove("key", Integer.class));
+  }
+
+  @Test
+  void remove_withTypedKey_returnsTypedValue() {
+    TypedKey<String> key = TypedKey.of("username", String.class);
+    context.put(key, "alice");
+
+    String result = context.remove(key);
+
+    assertEquals("alice", result);
+    assertFalse(context.containsKey("username"));
+  }
+
+  @Test
+  void remove_withTypedKey_missingKey_returnsNull() {
+    TypedKey<Integer> key = TypedKey.of("count", Integer.class);
+
+    Integer result = context.remove(key);
+
+    assertNull(result);
+  }
+
+  @Test
+  void remove_withTypedKey_wrongType_throwsClassCastException() {
+    TypedKey<Integer> key = TypedKey.of("value", Integer.class);
+    context.put("value", "not an integer");
+
+    assertThrows(ClassCastException.class, () -> context.remove(key));
+  }
+
+  @Test
+  void remove_multipleKeys_eachReturnsCorrectValue() {
+    context.put("key1", "value1");
+    context.put("key2", "value2");
+    context.put("key3", "value3");
+
+    assertEquals("value1", context.remove("key1"));
+    assertEquals("value2", context.remove("key2"));
+    assertEquals("value3", context.remove("key3"));
+
+    assertFalse(context.containsKey("key1"));
+    assertFalse(context.containsKey("key2"));
+    assertFalse(context.containsKey("key3"));
+  }
+
+  @Test
+  void remove_complexType_withType() {
+    List<String> list = Arrays.asList("a", "b", "c");
+    context.put("list", list);
+
+    @SuppressWarnings("unchecked")
+    List<String> result = (List<String>) context.remove("list", List.class);
+
+    assertEquals(list, result);
+    assertFalse(context.containsKey("list"));
+  }
+
+  @Test
+  void remove_sameKeyTwice_secondReturnsNull() {
+    context.put("key", "value");
+
+    assertEquals("value", context.remove("key"));
+    assertNull(context.remove("key"));
+  }
 }

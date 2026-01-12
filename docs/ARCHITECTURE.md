@@ -63,9 +63,13 @@ The Workflow Engine is designed as a flexible, extensible orchestration framewor
 │  │ GET/POST/PUT │  │  Read/Write  │  │  Conditional/Switch  │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Processing   │  │  Resilience  │  │     Composite        │  │
-│  │ JS/Shell Cmd │  │Retry/Timeout │  │       Tasks          │  │
+│  │ Database     │  │  Resilience  │  │     Composite        │  │
+│  │ JDBC Tasks   │  │Retry/Timeout │  │       Tasks          │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────┐                                              │
+│  │ Processing   │                                              │
+│  │ JS/Shell Cmd │                                              │
+│  └──────────────┘                                              │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -184,31 +188,88 @@ else:
                │
                ├── AbstractTask (abstract class)
                │         │
-               │         ├── AbstractHttpTask
+               │         ├── AbstractHttpTask (abstract class)
                │         │         ├── GetTask
                │         │         ├── PostTask
                │         │         ├── PutTask
                │         │         └── DeleteTask
                │         │
-               │         ├── FileReadTask
-               │         ├── FileWriteTask
-               │         ├── JavaScriptTask
-               │         └── ShellCommandTask
+               │         ├── HTTP & External I/O
+               │         │         ├── FileReadTask
+               │         │         └── FileWriteTask
+               │         │
+               │         ├── Database Operations
+               │         │         ├── JdbcQueryTask
+               │         │         ├── JdbcTypedQueryTask
+               │         │         ├── JdbcStreamingQueryTask
+               │         │         ├── JdbcUpdateTask
+               │         │         ├── JdbcBatchUpdateTask
+               │         │         ├── JdbcCallableTask
+               │         │         └── JdbcTransactionTask
+               │         │
+               │         ├── Processing & Scripting
+               │         │         ├── JavaScriptTask
+               │         │         └── ShellCommandTask
+               │         │
+               │         ├── Control Flow
+               │         │         ├── ConditionalTask
+               │         │         ├── SwitchTask
+               │         │         ├── CompositeTask
+               │         │         └── ParallelTask
+               │         │
+               │         ├── Resilience & Timing
+               │         │         ├── RetryingTask
+               │         │         ├── TimedTask
+               │         │         └── DelayTask
+               │         │
+               │         └── Utility
+               │                   └── NoOpTask
                │
-               ├── ConditionalTask
-               ├── SwitchTask
-               ├── CompositeTask
-               ├── ParallelTask
-               ├── RetryingTask
-               ├── TimedTask
-               └── Custom Tasks
+               └── Custom Task Implementations
 ```
 
 **Key Responsibilities:**
-- `Task`: Core contract defining `execute(WorkflowContext)`
-- `AbstractTask`: Provides common task infrastructure
-- `AbstractHttpTask`: Common HTTP functionality
-- Specialized tasks: Domain-specific implementations
+- `Task`: Core contract defining `execute(WorkflowContext)` - single method interface for task execution
+- `AbstractTask`: Provides common task infrastructure including name management and execution template
+- `AbstractHttpTask`: Base class for HTTP operations with common functionality (headers, authentication, response handling)
+- Specialized tasks: Domain-specific implementations organized by category
+
+**Task Categories:**
+
+1. **HTTP Tasks** - RESTful API interactions
+   - `GetTask`, `PostTask`, `PutTask`, `DeleteTask` - HTTP method implementations
+   - Support for request/response transformation, authentication, and error handling
+
+2. **File I/O Tasks** - Filesystem operations
+   - `FileReadTask` - Read file contents into context
+   - `FileWriteTask` - Write context data to files
+
+3. **Database Tasks** - JDBC-based data access
+   - `JdbcQueryTask` - Execute SELECT queries returning List<Map>
+   - `JdbcTypedQueryTask` - Type-safe queries with row mapping
+   - `JdbcStreamingQueryTask` - Memory-efficient streaming for large result sets
+   - `JdbcUpdateTask` - Execute INSERT/UPDATE/DELETE statements
+   - `JdbcBatchUpdateTask` - Batch operations for performance
+   - `JdbcCallableTask` - Call stored procedures with OUT parameters
+   - `JdbcTransactionTask` - Execute multiple tasks in a single transaction
+
+4. **Processing Tasks** - Code execution and transformation
+   - `JavaScriptTask` - Execute JavaScript code using GraalVM or Nashorn
+   - `ShellCommandTask` - Execute shell commands and capture output
+
+5. **Control Flow Tasks** - Conditional and composite execution
+   - `ConditionalTask` - Execute task based on condition
+   - `SwitchTask` - Multi-branch conditional execution
+   - `CompositeTask` - Sequential execution of multiple tasks
+   - `ParallelTask` - Concurrent execution of multiple tasks
+
+6. **Resilience Tasks** - Fault tolerance and timing
+   - `RetryingTask` - Automatic retry on failure with configurable policies
+   - `TimedTask` - Execute with timeout enforcement
+   - `DelayTask` - Introduce deliberate delays (rate limiting, pacing)
+
+7. **Utility Tasks** - Supporting functionality
+   - `NoOpTask` - Placeholder task with no operation (null-object pattern)
 
 ### 3. Context Management
 

@@ -237,6 +237,30 @@ public class WorkflowContext {
   }
 
   /**
+   * Remove a value from the context by key.
+   *
+   * @param key the context key
+   * @return the previous value associated with the key, or {@code null} if absent
+   */
+  public Object remove(String key) {
+    return context.remove(key);
+  }
+
+  /**
+   * Remove a typed value from the context by key.
+   *
+   * @param key the context key
+   * @param type the expected value type
+   * @param <T> the generic value type
+   * @return the typed value that was removed, or {@code null} if absent
+   * @throws ClassCastException if the stored value is not assignable to {@code type}
+   */
+  public <T> T remove(String key, Class<T> type) {
+    Object value = context.remove(key);
+    return value == null ? null : type.cast(value);
+  }
+
+  /**
    * Store a typed value in the context.
    *
    * @param key the typed key
@@ -308,6 +332,30 @@ public class WorkflowContext {
               + value.getClass().getName());
     }
     return key.type().cast(value);
+  }
+
+  /**
+   * Remove a typed value from the context by {@link TypedKey}.
+   *
+   * <p>Example:
+   *
+   * <pre>{@code
+   * TypedKey<Integer> COUNT = TypedKey.of("count", Integer.class);
+   *
+   * WorkflowContext ctx = new WorkflowContext();
+   * ctx.put(COUNT, 10);
+   *
+   * Integer removed = ctx.remove(COUNT); // returns 10
+   * Integer absent = ctx.remove(COUNT);   // returns null
+   * }</pre>
+   *
+   * @param key the typed key
+   * @param <T> the generic value type
+   * @return the typed value that was removed, or {@code null} if absent
+   */
+  public <T> T remove(TypedKey<T> key) {
+    Object value = context.remove(key.name());
+    return value == null ? null : key.type().cast(value);
   }
 
   /**
