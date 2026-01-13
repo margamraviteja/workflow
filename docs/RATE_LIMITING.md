@@ -124,7 +124,7 @@ RateLimitStrategy githubLimiter = new FixedWindowRateLimiter(
     Duration.ofHours(1)
 );
 
-Task fetchRepoTask = new GetTask.Builder<>(client)
+Task fetchRepoTask = new GetHttpTask.Builder<>(client)
     .url("https://api.github.com/repos/owner/repo")
     .header("Authorization", "token " + token)
     .build();

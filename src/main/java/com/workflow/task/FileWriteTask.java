@@ -49,7 +49,6 @@ import java.nio.file.Path;
  * <ul>
  *   <li>Writing is synchronous and blocking
  *   <li>Network filesystems may have significant latency
- *   <li>Wrap with {@link RetryingTask} to handle transient I/O errors
  * </ul>
  *
  * <p><b>Use Cases:</b>
@@ -95,19 +94,6 @@ import java.nio.file.Path;
  * if (result.getStatus() == WorkflowStatus.SUCCESS) {
  *     System.out.println("Processing complete. Output written.");
  * }
- * }</pre>
- *
- * <p><b>Example Usage - With Retry For Transient Errors:</b>
- *
- * <pre>{@code
- * // Retry writes to network filesystem
- * Task fileWriteTask = new FileWriteTask("data", Path.of("/mnt/shared/output.txt"));
- * Task resilientWrite = new RetryingTask(
- *     fileWriteTask,
- *     3,                           // Max 3 attempts
- *     Duration.ofMillis(500),      // Start with 500ms backoff
- *     2.0                          // Double backoff each retry
- * );
  * }</pre>
  *
  * @see FileReadTask

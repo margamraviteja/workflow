@@ -1,6 +1,7 @@
-package com.workflow.task;
+package com.workflow.helper;
 
 import com.workflow.context.WorkflowContext;
+import com.workflow.task.AbstractHttpTask;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
@@ -14,8 +15,8 @@ import lombok.experimental.UtilityClass;
  * handling body precedence (explicit body > context body > form data > empty), and managing
  * content-type headers.
  *
- * <p>This class eliminates duplication across PostTask, PutTask, and DeleteTask by centralizing
- * common body preparation logic.
+ * <p>This class eliminates duplication across PostHttpTask, PutHttpTask, and DeleteHttpTask by
+ * centralizing common body preparation logic.
  *
  * <p>Example usage:
  *

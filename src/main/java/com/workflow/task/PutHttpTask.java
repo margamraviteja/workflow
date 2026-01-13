@@ -1,6 +1,7 @@
 package com.workflow.task;
 
 import com.workflow.context.WorkflowContext;
+import com.workflow.helper.HttpTaskBodyHelper;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.util.LinkedHashMap;
@@ -54,7 +55,7 @@ import java.util.Map;
  *
  * <pre>{@code
  * HttpClient client = HttpClient.newHttpClient();
- * PutTask<String> updateTask = new PutTask.Builder<String>(client)
+ * PutHttpTask<String> updateTask = new PutHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/users/123")
  *     .body("{\"name\":\"Jane Doe\",\"email\":\"jane@example.com\",\"status\":\"active\"}")
  *     .responseType(String.class)
@@ -70,7 +71,7 @@ import java.util.Map;
  *
  * <pre>{@code
  * // PUT is idempotent - calling it multiple times has same effect as once
- * PutTask<String> idempotentUpdate = new PutTask.Builder<String>(client)
+ * PutHttpTask<String> idempotentUpdate = new PutHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/config/appSettings")
  *     .body("{\"maxConnections\":100,\"timeout\":5000}")
  *     .responseContextKey("configResult")
@@ -85,7 +86,7 @@ import java.util.Map;
  * <p><b>Example Usage - PUT with Form Data:</b>
  *
  * <pre>{@code
- * PutTask<String> updateStatusTask = new PutTask.Builder<String>(client)
+ * PutHttpTask<String> updateStatusTask = new PutHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/resources/456")
  *     .form(Map.of("status", "archived", "reason", "deprecated"))
  *     .responseType(String.class)
@@ -97,12 +98,12 @@ import java.util.Map;
  * <pre>{@code
  * SequentialWorkflow updateWorkflow = SequentialWorkflow.builder()
  *     .name("ResourceUpdateWorkflow")
- *     .task(new GetTask.Builder<User>(client)
+ *     .task(new GetHttpTask.Builder<User>(client)
  *         .url("https://api.example.com/users/123")
  *         .responseType(User.class)
  *         .responseContextKey("currentUser")
  *         .build())
- *     .task(new PutTask.Builder<String>(client)
+ *     .task(new PutHttpTask.Builder<String>(client)
  *         .url("https://api.example.com/users/123")
  *         .body("{\"name\":\"New Name\"}") // Merge with fetched data
  *         .build())
@@ -111,15 +112,15 @@ import java.util.Map;
  *
  * @param <T> the type to deserialize the response to
  * @see AbstractHttpTask
- * @see PostTask
- * @see GetTask
- * @see DeleteTask
+ * @see PostHttpTask
+ * @see GetHttpTask
+ * @see DeleteHttpTask
  */
-public class PutTask<T> extends AbstractHttpTask<T> {
+public class PutHttpTask<T> extends AbstractHttpTask<T> {
   private final String body;
   private final Map<String, String> formData;
 
-  private PutTask(Builder<T> b) {
+  private PutHttpTask(Builder<T> b) {
     super(b);
     this.body = b.body;
     this.formData = b.formData != null ? Map.copyOf(b.formData) : Map.of();
@@ -132,16 +133,16 @@ public class PutTask<T> extends AbstractHttpTask<T> {
   }
 
   /**
-   * Builder for PutTask with fluent API.
+   * Builder for PutHttpTask with fluent API.
    *
    * @param <T> the type of the response
    */
-  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, PutTask<T>, T> {
+  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, PutHttpTask<T>, T> {
     private String body;
     private Map<String, String> formData;
 
     /**
-     * Create a new PutTask.Builder.
+     * Create a new PutHttpTask.Builder.
      *
      * @param httpClient the HttpClient to use for requests (required)
      */
@@ -178,9 +179,9 @@ public class PutTask<T> extends AbstractHttpTask<T> {
     }
 
     @Override
-    public PutTask<T> build() {
+    public PutHttpTask<T> build() {
       HttpTaskBodyHelper.validateFormData(formData);
-      return new PutTask<>(this);
+      return new PutHttpTask<>(this);
     }
   }
 }

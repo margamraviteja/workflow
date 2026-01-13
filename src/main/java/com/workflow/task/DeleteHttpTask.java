@@ -1,6 +1,7 @@
 package com.workflow.task;
 
 import com.workflow.context.WorkflowContext;
+import com.workflow.helper.HttpTaskBodyHelper;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 
@@ -50,7 +51,7 @@ import java.net.http.HttpRequest;
  *
  * <pre>{@code
  * HttpClient client = HttpClient.newHttpClient();
- * DeleteTask<String> deleteTask = new DeleteTask.Builder<String>(client)
+ * DeleteHttpTask<String> deleteTask = new DeleteHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/users/123")
  *     .responseType(String.class)
  *     .build();
@@ -64,7 +65,7 @@ import java.net.http.HttpRequest;
  * <p><b>Example Usage - DELETE with JSON Body (Bulk Delete):</b>
  *
  * <pre>{@code
- * DeleteTask<String> bulkDeleteTask = new DeleteTask.Builder<String>(client)
+ * DeleteHttpTask<String> bulkDeleteTask = new DeleteHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/users/bulk")
  *     .body("{\"ids\": [1, 2, 3, 4, 5], \"reason\": \"cleanup\"}")
  *     .responseType(String.class)
@@ -78,7 +79,7 @@ import java.net.http.HttpRequest;
  * <p><b>Example Usage - DELETE with Query Parameters:</b>
  *
  * <pre>{@code
- * DeleteTask<String> deleteWithFilters = new DeleteTask.Builder<String>(client)
+ * DeleteHttpTask<String> deleteWithFilters = new DeleteHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/logs")
  *     .queryParam("olderThan", "30d")
  *     .queryParam("status", "archived")
@@ -91,13 +92,13 @@ import java.net.http.HttpRequest;
  * <pre>{@code
  * SequentialWorkflow cleanupWorkflow = SequentialWorkflow.builder()
  *     .name("ResourceCleanup")
- *     .task(new GetTask.Builder<List<Resource>>(client)
+ *     .task(new GetHttpTask.Builder<List<Resource>>(client)
  *         .url("https://api.example.com/resources")
  *         .queryParam("status", "defunct")
  *         .responseType(String.class)
  *         .responseContextKey("defunctResources")
  *         .build())
- *     .task(new DeleteTask.Builder<String>(client)
+ *     .task(new DeleteHttpTask.Builder<String>(client)
  *         .url("https://api.example.com/resources/batch")
  *         .body("// build from defunctResources")
  *         .responseContextKey("cleanupResult")
@@ -109,7 +110,7 @@ import java.net.http.HttpRequest;
  *
  * <pre>{@code
  * // DELETE is idempotent - safe to call multiple times
- * DeleteTask<String> safeDelete = new DeleteTask.Builder<String>(client)
+ * DeleteHttpTask<String> safeDelete = new DeleteHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/temp/" + sessionId)
  *     .responseType(String.class)
  *     .build();
@@ -122,14 +123,14 @@ import java.net.http.HttpRequest;
  *
  * @param <T> the type to deserialize the response to
  * @see AbstractHttpTask
- * @see PostTask
- * @see PutTask
- * @see GetTask
+ * @see PostHttpTask
+ * @see PutHttpTask
+ * @see GetHttpTask
  */
-public class DeleteTask<T> extends AbstractHttpTask<T> {
+public class DeleteHttpTask<T> extends AbstractHttpTask<T> {
   private final String body;
 
-  private DeleteTask(Builder<T> b) {
+  private DeleteHttpTask(Builder<T> b) {
     super(b);
     this.body = b.body;
   }
@@ -145,15 +146,16 @@ public class DeleteTask<T> extends AbstractHttpTask<T> {
   }
 
   /**
-   * Builder for DeleteTask with fluent API.
+   * Builder for DeleteHttpTask with fluent API.
    *
    * @param <T> the type of the response
    */
-  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, DeleteTask<T>, T> {
+  public static class Builder<T>
+      extends AbstractHttpTask.Builder<Builder<T>, DeleteHttpTask<T>, T> {
     private String body;
 
     /**
-     * Create a new DeleteTask.Builder.
+     * Create a new DeleteHttpTask.Builder.
      *
      * @param httpClient the HttpClient to use for requests (required)
      */
@@ -179,8 +181,8 @@ public class DeleteTask<T> extends AbstractHttpTask<T> {
     }
 
     @Override
-    public DeleteTask<T> build() {
-      return new DeleteTask<>(this);
+    public DeleteHttpTask<T> build() {
+      return new DeleteHttpTask<>(this);
     }
   }
 }

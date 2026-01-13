@@ -936,7 +936,7 @@ public class ApiTaskWithValidation extends AbstractHttpTask<User> {
 **Default Response Mapper (Simple Cases)**:
 
 ```java
-public class SimpleGetTask extends AbstractHttpTask<String> {
+public class SimpleGetHttpTask extends AbstractHttpTask<String> {
     @Override
     protected Function<HttpResponse<String>, String> getResponseMapper() {
         // Just returns the body as-is, no validation
@@ -1216,9 +1216,9 @@ public class PipelineRunner {
         System.out.println(workflow.toTreeString());
         /* Output:
         └── DataPipeline [Sequence]
-            ├── ValidationTask [Task]
-            ├── TransformTask [Task]
-            └── SaveTask [Task]
+            ├── ValidationTask (Task)
+            ├── TransformTask (Task)
+            └── SaveTask (Task)
         */
     }
 }

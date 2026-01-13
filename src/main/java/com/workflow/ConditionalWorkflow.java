@@ -128,9 +128,7 @@ public class ConditionalWorkflow extends AbstractWorkflow implements WorkflowCon
   @Override
   public List<Workflow> getSubWorkflows() {
     List<Workflow> subWorkflows = new ArrayList<>();
-    if (whenTrue != null) {
-      subWorkflows.add(new TreeRenderer.TreeLabelWrapper("When True ->", whenTrue));
-    }
+    subWorkflows.add(new TreeRenderer.TreeLabelWrapper("When True ->", whenTrue));
     if (whenFalse != null) {
       subWorkflows.add(new TreeRenderer.TreeLabelWrapper("When False ->", whenFalse));
     }
@@ -197,13 +195,11 @@ public class ConditionalWorkflow extends AbstractWorkflow implements WorkflowCon
      * Builds the conditional workflow.
      *
      * @return the configured conditional workflow
-     * @throws NullPointerException if condition is null
-     * @throws IllegalArgumentException if both whenTrue and whenFalse are null
+     * @throws NullPointerException if condition or whenTrue is null
      */
     public ConditionalWorkflow build() {
       ValidationUtils.requireNonNull(condition, "condition");
-      ValidationUtils.requireAtLeastOne(
-          "At least one of whenTrue or whenFalse must be provided", whenTrue, whenFalse);
+      ValidationUtils.requireNonNull(whenTrue, "whenTrue");
       return new ConditionalWorkflow(this);
     }
   }

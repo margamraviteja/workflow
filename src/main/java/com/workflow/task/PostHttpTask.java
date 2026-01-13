@@ -1,6 +1,7 @@
 package com.workflow.task;
 
 import com.workflow.context.WorkflowContext;
+import com.workflow.helper.HttpTaskBodyHelper;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.util.LinkedHashMap;
@@ -26,7 +27,7 @@ import java.util.Map;
  * WorkflowContext context = new WorkflowContext();
  *
  * // With explicit JSON body
- * PostTask<String> postTask = new PostTask.Builder<String>(httpClient)
+ * PostHttpTask<String> postTask = new PostHttpTask.Builder<String>(httpClient)
  *    .url("https://api.example.com/resource")
  *    .body("{\"name\":\"example\",\"value\":42}")
  *    .responseType(String.class)
@@ -36,7 +37,7 @@ import java.util.Map;
  * String response = context.getTyped("httpResponse", String.class);
  *
  * // With form data
- * PostTask<String> formTask = new PostTask.Builder<String>(httpClient)
+ * PostHttpTask<String> formTask = new PostHttpTask.Builder<String>(httpClient)
  *    .url("https://api.example.com/resource")
  *    .form(Map.of("username", "john", "password", "secret"))
  *    .build();
@@ -46,11 +47,11 @@ import java.util.Map;
  * @see AbstractHttpTask
  * @see HttpTaskBodyHelper
  */
-public class PostTask<T> extends AbstractHttpTask<T> {
+public class PostHttpTask<T> extends AbstractHttpTask<T> {
   private final String body;
   private final Map<String, String> formData;
 
-  private PostTask(Builder<T> b) {
+  private PostHttpTask(Builder<T> b) {
     super(b);
     this.body = b.body;
     this.formData = b.formData != null ? Map.copyOf(b.formData) : Map.of();
@@ -67,16 +68,16 @@ public class PostTask<T> extends AbstractHttpTask<T> {
   }
 
   /**
-   * Builder for PostTask with fluent API.
+   * Builder for PostHttpTask with fluent API.
    *
    * @param <T> the type of the response
    */
-  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, PostTask<T>, T> {
+  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, PostHttpTask<T>, T> {
     private String body;
     private Map<String, String> formData;
 
     /**
-     * Create a new PostTask.Builder.
+     * Create a new PostHttpTask.Builder.
      *
      * @param httpClient the HttpClient to use for requests (required)
      */
@@ -113,9 +114,9 @@ public class PostTask<T> extends AbstractHttpTask<T> {
     }
 
     @Override
-    public PostTask<T> build() {
+    public PostHttpTask<T> build() {
       HttpTaskBodyHelper.validateFormData(formData);
-      return new PostTask<>(this);
+      return new PostHttpTask<>(this);
     }
   }
 }

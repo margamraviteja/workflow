@@ -137,6 +137,8 @@ import lombok.extern.slf4j.Slf4j;
  * @see com.workflow.ratelimit.SlidingWindowRateLimiter
  * @see com.workflow.ratelimit.TokenBucketRateLimiter
  * @see com.workflow.ratelimit.LeakyBucketRateLimiter
+ * @see com.workflow.ratelimit.Resilience4jRateLimiter
+ * @see com.workflow.ratelimit.Bucket4jRateLimiter
  */
 @Slf4j
 @Builder

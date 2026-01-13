@@ -47,7 +47,6 @@ import java.security.SecureRandom;
  * }</pre>
  *
  * @see RetryPolicy.BackoffStrategy
- * @see com.workflow.task.RetryingTask
  * @see com.workflow.task.TaskDescriptor
  */
 public interface RetryPolicy {

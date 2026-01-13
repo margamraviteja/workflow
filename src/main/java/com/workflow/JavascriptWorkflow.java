@@ -75,7 +75,6 @@ import org.graalvm.polyglot.io.IOAccess;
  *
  * @see ScriptProvider
  * @see AbstractWorkflow
- * @see com.workflow.task.JavaScriptTask
  */
 public class JavascriptWorkflow extends AbstractWorkflow {
   /**

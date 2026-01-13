@@ -59,23 +59,6 @@ class ConditionalWorkflowEnhancedTest {
   }
 
   @Test
-  void builder_withOnlyWhenFalse_skipsWhenConditionTrue() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("enabled", true);
-
-    Workflow workflow = WorkflowTestUtils.mockSuccessfulWorkflow("false-only");
-
-    Workflow conditional =
-        ConditionalWorkflow.builder()
-            .condition(ctx -> ctx.getTyped("enabled", Boolean.class))
-            .whenFalse(workflow)
-            .build();
-
-    WorkflowResult result = conditional.execute(context);
-    assertEquals(WorkflowStatus.SKIPPED, result.getStatus());
-  }
-
-  @Test
   void builder_withoutCondition_throwsException() {
     try {
       ConditionalWorkflow.builder().whenTrue(WorkflowTestUtils.mockSuccessfulWorkflow()).build();

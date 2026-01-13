@@ -69,21 +69,8 @@ import com.workflow.exception.TaskExecutionException;
  * WorkflowResult result = rateLimitedPipeline.execute(context);
  * }</pre>
  *
- * <p><b>Example Usage - Exponential Backoff with RetryingTask:</b>
- *
- * <pre>{@code
- * // DelayTask is used internally by RetryingTask for backoff, but can also be used manually
- * Task unreliableTask = new UnreliableHttpTask();
- * SequentialWorkflow retryWithBackoff = SequentialWorkflow.builder()
- *     .task(unreliableTask)
- *     .task(new DelayTask(1000))
- *     .task(unreliableTask)  // Retry manually
- *     .build();
- * }</pre>
- *
  * @see Task
  * @see AbstractTask
- * @see RetryingTask
  */
 public class DelayTask extends AbstractTask {
   private final long millis;

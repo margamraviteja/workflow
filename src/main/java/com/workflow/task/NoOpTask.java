@@ -36,45 +36,6 @@ import com.workflow.context.WorkflowContext;
  *   <li>Simplifying conditional logic in workflows
  * </ul>
  *
- * <p><b>Example Usage - Optional Task With Fallback:</b>
- *
- * <pre>{@code
- * Task actualTask = new DataProcessingTask();
- * Task optionalTask = new ConditionalTask(
- *     ctx -> Boolean.TRUE.equals(ctx.get("isEnabled")),
- *     actualTask
- * );
- * // If condition is false, the task completes silently with no-op behavior
- * }</pre>
- *
- * <p><b>Example Usage - Default in Switch Logic:</b>
- *
- * <pre>{@code
- * SwitchTask switchTask = SwitchTask.builder()
- *     .switchKey("processingType")
- *     .cases(Map.of(
- *         "standard", new StandardProcessTask(),
- *         "premium", new PremiumProcessTask()
- *     ))
- *     .defaultTask(new NoOpTask())  // Do nothing for unrecognized types
- *     .build();
- * }</pre>
- *
- * <p><b>Example Usage - Testing Workflow Composition:</b>
- *
- * <pre>{@code
- * // Test that a workflow composes correctly without side effects
- * SequentialWorkflow testWorkflow = SequentialWorkflow.builder()
- *     .task(new NoOpTask())
- *     .task(new NoOpTask())
- *     .task(new NoOpTask())
- *     .build();
- *
- * WorkflowContext context = new WorkflowContext();
- * WorkflowResult result = testWorkflow.execute(context);
- * assert result.getStatus() == WorkflowStatus.SUCCESS;
- * }</pre>
- *
  * @see Task
  * @see AbstractTask
  */

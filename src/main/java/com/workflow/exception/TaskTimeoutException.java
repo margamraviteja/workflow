@@ -17,7 +17,6 @@ package com.workflow.exception;
  *   <li>The task execution may continue in the background
  *   <li>No further retries are attempted after timeout
  *   <li>Partial state changes from the timed-out task may persist in the context
- *   <li>Wrapper exceptions (like in ParallelTask) may suppress this exception
  * </ul>
  *
  * <p><b>Recovery Strategies:</b>

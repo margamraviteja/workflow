@@ -150,7 +150,8 @@ public class DataPipelineRunner {
 ```java
 import com.workflow.*;
 import com.workflow.context.WorkflowContext;
-import com.workflow.task.GetTask;
+import com.workflow.task.GetHttpTask;
+
 import java.net.http.HttpClient;
 
 public class UserDataService {
@@ -160,15 +161,15 @@ public class UserDataService {
         // Define the parallel workflow
         Workflow parallelFetch = ParallelWorkflow.builder()
                 .name("FetchUserData")
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/users/123")
                         .responseContextKey("userData")
                         .build())
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/orders?userId=123")
                         .responseContextKey("ordersData")
                         .build())
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/preferences/123")
                         .responseContextKey("preferencesData")
                         .build())
@@ -258,18 +259,19 @@ public class ResilientTaskExample {
 import com.workflow.*;
 import com.workflow.context.WorkflowContext;
 import com.workflow.task.*;
+
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 
 public class FallbackExample {
     public WorkflowResult fetchDataWithFallback(WorkflowContext context) {
         HttpClient client = HttpClient.newHttpClient();
-        
+
         Workflow withFallback = FallbackWorkflow.builder()
                 .name("DataRetrieval")
                 .primary(SequentialWorkflow.builder()
                         .name("APIRetrieval")
-                        .task(new GetTask.Builder<>(client)
+                        .task(new GetHttpTask.Builder<>(client)
                                 .url("https://api.example.com/data")
                                 .responseContextKey("data")
                                 .build())

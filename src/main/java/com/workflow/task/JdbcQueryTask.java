@@ -119,7 +119,6 @@ import javax.sql.DataSource;
  *   <li>For large result sets, consider pagination with LIMIT/OFFSET or streaming via {@link
  *       JdbcStreamingQueryTask}
  *   <li>Index columns used in WHERE clauses for better query performance
- *   <li>Use {@link RetryingTask} wrapper for transient connection failures
  * </ul>
  *
  * <p><b>Use Cases:</b>

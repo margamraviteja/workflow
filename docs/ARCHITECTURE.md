@@ -189,10 +189,10 @@ else:
                ├── AbstractTask (abstract class)
                │         │
                │         ├── AbstractHttpTask (abstract class)
-               │         │         ├── GetTask
-               │         │         ├── PostTask
-               │         │         ├── PutTask
-               │         │         └── DeleteTask
+               │         │         ├── GetHttpTask
+               │         │         ├── PostHttpTask
+               │         │         ├── PutHttpTask
+               │         │         └── DeleteHttpTask
                │         │
                │         ├── HTTP & External I/O
                │         │         ├── FileReadTask
@@ -208,22 +208,11 @@ else:
                │         │         └── JdbcTransactionTask
                │         │
                │         ├── Processing & Scripting
-               │         │         ├── JavaScriptTask
                │         │         └── ShellCommandTask
                │         │
-               │         ├── Control Flow
-               │         │         ├── ConditionalTask
-               │         │         ├── SwitchTask
-               │         │         ├── CompositeTask
-               │         │         └── ParallelTask
-               │         │
-               │         ├── Resilience & Timing
-               │         │         ├── RetryingTask
-               │         │         ├── TimedTask
-               │         │         └── DelayTask
-               │         │
                │         └── Utility
-               │                   └── NoOpTask
+               │                   ├── NoOpTask
+               │                   └── DelayTask
                │
                └── Custom Task Implementations
 ```
@@ -237,7 +226,7 @@ else:
 **Task Categories:**
 
 1. **HTTP Tasks** - RESTful API interactions
-   - `GetTask`, `PostTask`, `PutTask`, `DeleteTask` - HTTP method implementations
+   - `GetHttpTask`, `PostHttpTask`, `PutHttpTask`, `DeleteHttpTask` - HTTP method implementations
    - Support for request/response transformation, authentication, and error handling
 
 2. **File I/O Tasks** - Filesystem operations
@@ -250,26 +239,15 @@ else:
    - `JdbcStreamingQueryTask` - Memory-efficient streaming for large result sets
    - `JdbcUpdateTask` - Execute INSERT/UPDATE/DELETE statements
    - `JdbcBatchUpdateTask` - Batch operations for performance
-   - `JdbcCallableTask` - Call stored procedures with OUT parameters
+   - `JdbcCallableTask` - Call stored procedures with - OUT parameters
    - `JdbcTransactionTask` - Execute multiple tasks in a single transaction
 
 4. **Processing Tasks** - Code execution and transformation
-   - `JavaScriptTask` - Execute JavaScript code using GraalVM or Nashorn
    - `ShellCommandTask` - Execute shell commands and capture output
 
-5. **Control Flow Tasks** - Conditional and composite execution
-   - `ConditionalTask` - Execute task based on condition
-   - `SwitchTask` - Multi-branch conditional execution
-   - `CompositeTask` - Sequential execution of multiple tasks
-   - `ParallelTask` - Concurrent execution of multiple tasks
-
-6. **Resilience Tasks** - Fault tolerance and timing
-   - `RetryingTask` - Automatic retry on failure with configurable policies
-   - `TimedTask` - Execute with timeout enforcement
-   - `DelayTask` - Introduce deliberate delays (rate limiting, pacing)
-
-7. **Utility Tasks** - Supporting functionality
+5. **Utility Tasks** - Supporting functionality
    - `NoOpTask` - Placeholder task with no operation (null-object pattern)
+   - `DelayTask` - Introduce deliberate delays (rate limiting, pacing)
 
 ### 3. Context Management
 
@@ -414,22 +392,8 @@ else:
    - Read/write with encoding support
    - Path-based operations
 
-3. **Control Flow Tasks**: Conditional execution
-   - ConditionalTask: if-then-else
-   - SwitchTask: multi-way branching
-   - DelayTask: Introduce pauses
-
-4. **Processing Tasks**: External execution
-   - JavaScriptTask: GraalVM JS execution
+3. **Processing Tasks**: External execution
    - ShellCommandTask: System command execution
-
-5. **Resilience Tasks**: Decorators
-   - RetryingTask: Add retry logic
-   - TimedTask: Add timeout
-
-6. **Composite Tasks**: Task composition
-   - CompositeTask: Sequential composition
-   - ParallelTask: Parallel composition
 
 ### Layer 4: Infrastructure Layer
 **Purpose**: Cross-cutting concerns

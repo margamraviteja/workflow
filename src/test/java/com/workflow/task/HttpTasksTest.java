@@ -18,8 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for GetTask, PostTask, PutTask, DeleteTask using an in-process WireMock server. The tests
- * use a dynamic port to avoid collisions.
+ * Tests for GetHttpTask, PostHttpTask, PutHttpTask, DeleteHttpTask using an in-process WireMock
+ * server. The tests use a dynamic port to avoid collisions.
  */
 class HttpTasksTest {
 
@@ -51,8 +51,8 @@ class HttpTasksTest {
     wm.stubFor(
         get(urlPathEqualTo("/test/get")).willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient).url(baseUrl + "/test/get").build();
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/get").build();
 
     task.execute(context);
 
@@ -69,8 +69,8 @@ class HttpTasksTest {
     wm.stubFor(
         get(urlPathEqualTo("/test/get2")).willReturn(aResponse().withStatus(200).withBody("ok2")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/get2")
             .header("accept", "text/plain")
             .build();
@@ -95,8 +95,8 @@ class HttpTasksTest {
     ctxParams.put("b", "ctxB");
     context.put("queryParams", ctxParams);
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/q")
             .queryParam("a", "fromBuilder")
             .queryParam("c", "builderC")
@@ -119,8 +119,8 @@ class HttpTasksTest {
             .willReturn(aResponse().withStatus(201).withBody("created")));
 
     Map<String, String> form = Map.of("k", "v with space");
-    PostTask<String> task =
-        new PostTask.Builder<String>(httpClient)
+    PostHttpTask<String> task =
+        new PostHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/post")
             .form(form)
             .body("{\"x\":1}")
@@ -145,8 +145,8 @@ class HttpTasksTest {
             .withHeader("Content-Type", containing("application/json"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    PostTask<String> task =
-        new PostTask.Builder<String>(httpClient).url(baseUrl + "/test/post2").build();
+    PostHttpTask<String> task =
+        new PostHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/post2").build();
 
     context.put("requestBody", "{\"from\":\"ctx\"}");
 
@@ -167,8 +167,11 @@ class HttpTasksTest {
 
     Map<String, String> form = new LinkedHashMap<>();
     form.put("a key", "value+plus & equals=");
-    PostTask<String> task =
-        new PostTask.Builder<String>(httpClient).url(baseUrl + "/test/post3").form(form).build();
+    PostHttpTask<String> task =
+        new PostHttpTask.Builder<String>(httpClient)
+            .url(baseUrl + "/test/post3")
+            .form(form)
+            .build();
 
     task.execute(context);
 
@@ -186,8 +189,8 @@ class HttpTasksTest {
             .withHeader("Content-Type", equalTo("application/custom"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    PostTask<String> task =
-        new PostTask.Builder<String>(httpClient)
+    PostHttpTask<String> task =
+        new PostHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/post4")
             .header("content-type", "application/custom")
             .build();
@@ -210,8 +213,8 @@ class HttpTasksTest {
 
     Map<String, String> form = new LinkedHashMap<>();
     form.put("k", "v");
-    PutTask<String> task =
-        new PutTask.Builder<String>(httpClient)
+    PutHttpTask<String> task =
+        new PutHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/put")
             .form(form)
             .body("{\"put\":true}")
@@ -236,8 +239,8 @@ class HttpTasksTest {
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
     Map<String, String> form = Map.of("x", "y");
-    PutTask<String> task =
-        new PutTask.Builder<String>(httpClient).url(baseUrl + "/test/put2").form(form).build();
+    PutHttpTask<String> task =
+        new PutHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/put2").form(form).build();
 
     task.execute(context);
 
@@ -253,8 +256,8 @@ class HttpTasksTest {
             .withRequestBody(equalToJson("{\"id\":1}"))
             .willReturn(aResponse().withStatus(200).withBody("deleted")));
 
-    DeleteTask<String> task =
-        new DeleteTask.Builder<String>(httpClient)
+    DeleteHttpTask<String> task =
+        new DeleteHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/delete")
             .body("{\"id\":1}")
             .build();
@@ -276,8 +279,8 @@ class HttpTasksTest {
             .withRequestBody(equalToJson("{\"from\":\"ctx\"}"))
             .willReturn(aResponse().withStatus(200).withBody("deleted")));
 
-    DeleteTask<String> task =
-        new DeleteTask.Builder<String>(httpClient).url(baseUrl + "/test/delete2").build();
+    DeleteHttpTask<String> task =
+        new DeleteHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/delete2").build();
 
     context.put("requestBody", "{\"from\":\"ctx\"}");
 
@@ -294,8 +297,8 @@ class HttpTasksTest {
         delete(urlPathEqualTo("/test/delete3"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    DeleteTask<String> task =
-        new DeleteTask.Builder<String>(httpClient).url(baseUrl + "/test/delete3").build();
+    DeleteHttpTask<String> task =
+        new DeleteHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/delete3").build();
 
     task.execute(context);
 
@@ -310,12 +313,12 @@ class HttpTasksTest {
         get(urlPathEqualTo("/test/error"))
             .willReturn(aResponse().withStatus(500).withBody("{\"error\":\"boom\"}")));
 
-    GetTask.Builder<String> b =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask.Builder<String> b =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/error")
             .responseMapper(ResponseMappers.strictTypedMapper(String.class));
 
-    GetTask<String> task = b.build();
+    GetHttpTask<String> task = b.build();
 
     TaskExecutionException ex =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
@@ -330,12 +333,12 @@ class HttpTasksTest {
             .willReturn(aResponse().withStatus(200).withBody("slow").withFixedDelay(500)));
 
     // HttpClient default is fine; set a short timeout on the task builder
-    GetTask.Builder<String> b =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask.Builder<String> b =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/slow")
             .timeout(Duration.ofMillis(100)); // very short timeout
 
-    GetTask<String> task = b.build();
+    GetHttpTask<String> task = b.build();
 
     TaskExecutionException ex =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
@@ -351,8 +354,8 @@ class HttpTasksTest {
             .withQueryParam("unicode", equalTo("✓"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/q2")
             .queryParam("space", "a b")
             .queryParam("plus", "a+b")
@@ -375,8 +378,8 @@ class HttpTasksTest {
             .withRequestBody(equalToJson("{\"emoji\":\"😊\"}"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    PostTask<String> task =
-        new PostTask.Builder<String>(httpClient)
+    PostHttpTask<String> task =
+        new PostHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/post-utf8")
             .body("{\"emoji\":\"😊\"}")
             .build();
@@ -390,8 +393,8 @@ class HttpTasksTest {
 
   @Test
   void putTask_builderValidation_rejectsInvalidFormEntries() {
-    PutTask.Builder<String> b =
-        new PutTask.Builder<String>(httpClient)
+    PutHttpTask.Builder<String> b =
+        new PutHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/invalid-form")
             .form(Map.of(" ", "value")); // invalid key (blank)
 
@@ -410,8 +413,8 @@ class HttpTasksTest {
       public String x;
     }
 
-    GetTask<Foo> task =
-        new GetTask.Builder<Foo>(httpClient)
+    GetHttpTask<Foo> task =
+        new GetHttpTask.Builder<Foo>(httpClient)
             .url(baseUrl + "/test/empty")
             .responseType(Foo.class)
             .build();
@@ -431,12 +434,12 @@ class HttpTasksTest {
         get(urlPathEqualTo("/test/large-error"))
             .willReturn(aResponse().withStatus(500).withBody(largeBody)));
 
-    GetTask.Builder<String> b =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask.Builder<String> b =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/large-error")
             .responseMapper(ResponseMappers.strictTypedMapper(String.class));
 
-    GetTask<String> task = b.build();
+    GetHttpTask<String> task = b.build();
 
     TaskExecutionException ex =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
@@ -451,7 +454,7 @@ class HttpTasksTest {
 
   @Test
   void getTask_throwsExceptionWhenUrlIsNull() {
-    GetTask<String> task = new GetTask.Builder<String>(httpClient).build();
+    GetHttpTask<String> task = new GetHttpTask.Builder<String>(httpClient).build();
 
     TaskExecutionException ex =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
@@ -460,7 +463,7 @@ class HttpTasksTest {
 
   @Test
   void getTask_throwsExceptionWhenUrlIsBlank() {
-    GetTask<String> task = new GetTask.Builder<String>(httpClient).url("   ").build();
+    GetHttpTask<String> task = new GetHttpTask.Builder<String>(httpClient).url("   ").build();
 
     TaskExecutionException ex =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
@@ -473,8 +476,8 @@ class HttpTasksTest {
         get(urlPathEqualTo("/test/dynamic"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient).urlFromContext("dynamicUrl").build();
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient).urlFromContext("dynamicUrl").build();
     context.put("dynamicUrl", baseUrl + "/test/dynamic");
 
     task.execute(context);
@@ -489,8 +492,8 @@ class HttpTasksTest {
         get(urlPathEqualTo("/test/custom-key"))
             .willReturn(aResponse().withStatus(200).withBody("custom")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/custom-key")
             .responseContextKey("myResponse")
             .build();
@@ -507,8 +510,8 @@ class HttpTasksTest {
         get(urlPathEqualTo("/test/null-response"))
             .willReturn(aResponse().withStatus(200).withBody("")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/null-response")
             .responseMapper(_ -> null)
             .build();
@@ -523,8 +526,8 @@ class HttpTasksTest {
     Map<String, String> invalidForm = new LinkedHashMap<>();
     invalidForm.put("key", null);
 
-    PostTask.Builder<String> builder =
-        new PostTask.Builder<String>(httpClient).url(baseUrl + "/test").form(invalidForm);
+    PostHttpTask.Builder<String> builder =
+        new PostHttpTask.Builder<String>(httpClient).url(baseUrl + "/test").form(invalidForm);
 
     assertThrows(IllegalArgumentException.class, builder::build);
   }
@@ -536,8 +539,8 @@ class HttpTasksTest {
             .withHeader("X-Custom", equalTo("customized"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    GetTask<String> task =
-        new GetTask.Builder<String>(httpClient)
+    GetHttpTask<String> task =
+        new GetHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/customizer")
             .requestCustomizer((builder, _) -> builder.header("X-Custom", "customized"))
             .build();
@@ -556,8 +559,8 @@ class HttpTasksTest {
             .withRequestBody(equalToJson("{\"id\":99}"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    DeleteTask<String> task =
-        new DeleteTask.Builder<String>(httpClient).url(baseUrl + "/test/delete-ctx").build();
+    DeleteHttpTask<String> task =
+        new DeleteHttpTask.Builder<String>(httpClient).url(baseUrl + "/test/delete-ctx").build();
 
     context.put("requestBody", "{\"id\":99}");
     task.execute(context);
@@ -574,8 +577,8 @@ class HttpTasksTest {
             .withRequestBody(equalToJson("{\"context\":true}"))
             .willReturn(aResponse().withStatus(200).withBody("ok")));
 
-    PutTask<String> task =
-        new PutTask.Builder<String>(httpClient)
+    PutHttpTask<String> task =
+        new PutHttpTask.Builder<String>(httpClient)
             .url(baseUrl + "/test/put-ctx")
             .form(Map.of("key", "value"))
             .build();

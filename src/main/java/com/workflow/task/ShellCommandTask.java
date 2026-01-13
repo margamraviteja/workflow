@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>Does not capture stderr separately
  *   <li>Output is loaded entirely into memory (large outputs may cause memory issues)
- *   <li>No timeout mechanism built-in (use TimedTask for timeout protection)
+ *   <li>No timeout mechanism built-in
  *   <li>Interactive commands are not supported
  * </ul>
  *
@@ -125,7 +125,6 @@ import java.util.stream.Collectors;
  *
  * @see Task
  * @see AbstractTask
- * @see TimedTask (for adding timeout protection)
  * @see java.lang.ProcessBuilder
  */
 public class ShellCommandTask extends AbstractTask {

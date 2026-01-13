@@ -1,8 +1,5 @@
 # Workflow Engine
 
-> [!IMPORTANT]
-> Note: Codebase is generated/implemented by Copilot, Claude and Gemini AI Tools
-
 A flexible workflow orchestration library for Java that enables you to build complex business processes with ease. Built on top of modern Java features and GraalVM, it provides both compile-time type safety and runtime flexibility.
 
 ## Overview
@@ -104,24 +101,25 @@ public class MyWorkflowApp {
 ```java
 import com.workflow.*;
 import com.workflow.context.WorkflowContext;
-import com.workflow.task.GetTask;
+import com.workflow.task.GetHttpTask;
+
 import java.net.http.HttpClient;
 
 public class ApiAggregator {
     public void aggregateData() {
         HttpClient client = HttpClient.newHttpClient();
-        
+
         Workflow parallelWorkflow = ParallelWorkflow.builder()
                 .name("DataAggregation")
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/users")
                         .responseContextKey("usersData")
                         .build())
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/orders")
                         .responseContextKey("ordersData")
                         .build())
-                .task(new GetTask.Builder<>(client)
+                .task(new GetHttpTask.Builder<>(client)
                         .url("https://api.example.com/products")
                         .responseContextKey("productsData")
                         .build())
@@ -273,12 +271,13 @@ ctx.put('finalPrice', final);
 ```java
 import com.workflow.policy.*;
 import com.workflow.task.*;
+
 import java.net.http.HttpClient;
 
 public class ResilientWorkflowExample {
     public Workflow buildResilientTask(HttpClient client) {
         TaskDescriptor taskWithPolicies = TaskDescriptor.builder()
-                .task(new PostTask.Builder<>(client)
+                .task(new PostHttpTask.Builder<>(client)
                         .url("https://api.example.com/process")
                         .build())
                 .retryPolicy(RetryPolicy.exponentialBackoff(3, 1000))
@@ -532,10 +531,10 @@ public class WorkflowSecurity {
 The framework provides a rich set of pre-built tasks. For complete documentation, see [TASKS.md](docs/TASKS.md).
 
 ### HTTP Tasks
-- `GetTask` - HTTP GET requests
-- `PostTask` - HTTP POST requests
-- `PutTask` - HTTP PUT requests
-- `DeleteTask` - HTTP DELETE requests
+- `GetHttpTask` - HTTP GET requests
+- `PostHttpTask` - HTTP POST requests
+- `PutHttpTask` - HTTP PUT requests
+- `DeleteHttpTask` - HTTP DELETE requests
 
 ### File Tasks
 - `FileReadTask` - Read file contents
@@ -550,21 +549,12 @@ The framework provides a rich set of pre-built tasks. For complete documentation
 - `JdbcCallableTask` - Execute stored procedures
 - `JdbcTransactionTask` - Transactional task execution
 
-### Control Flow Tasks
-- `ConditionalTask` - Conditional execution
-- `SwitchTask` - Multi-way branching
+### Utility Tasks
 - `DelayTask` - Introduce delays
 - `NoOpTask` - No operation (testing)
 
 ### Processing Tasks
-- `JavaScriptTask` - Execute JavaScript code
 - `ShellCommandTask` - Execute shell commands
-- `CompositeTask` - Compose multiple tasks
-- `ParallelTask` - Parallel task execution
-
-### Resilience Tasks
-- `RetryingTask` - Add retry logic to any task
-- `TimedTask` - Add timeout to any task
 
 ## Rate Limiting Strategies
 

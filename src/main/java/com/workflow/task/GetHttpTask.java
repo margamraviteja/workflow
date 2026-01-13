@@ -34,7 +34,7 @@ import java.net.http.HttpRequest;
  * HttpClient client = HttpClient.newHttpClient();
  * WorkflowContext context = new WorkflowContext();
  *
- * GetTask<String> task = new GetTask.Builder<String>(client)
+ * GetHttpTask<String> task = new GetHttpTask.Builder<String>(client)
  *     .url("https://api.example.com/users")
  *     .build();
  *
@@ -45,7 +45,7 @@ import java.net.http.HttpRequest;
  * <p><b>Example usage - Typed response:</b>
  *
  * <pre>{@code
- * GetTask<User> task = new GetTask.Builder<User>(client)
+ * GetHttpTask<User> task = new GetHttpTask.Builder<User>(client)
  *     .url("https://api.example.com/users/123")
  *     .responseType(User.class)
  *     .header("Authorization", "Bearer token")
@@ -61,7 +61,7 @@ import java.net.http.HttpRequest;
  * context.put("apiUrl", "https://api.example.com/search");
  * context.put("queryParams", Map.of("q", "java", "limit", "10"));
  *
- * GetTask<String> task = new GetTask.Builder<String>(client)
+ * GetHttpTask<String> task = new GetHttpTask.Builder<String>(client)
  *     .urlFromContext("apiUrl")
  *     .build();
  *
@@ -70,13 +70,13 @@ import java.net.http.HttpRequest;
  *
  * @param <T> the type of the deserialized response
  * @see AbstractHttpTask
- * @see PostTask
- * @see PutTask
- * @see DeleteTask
+ * @see PostHttpTask
+ * @see PutHttpTask
+ * @see DeleteHttpTask
  */
-public class GetTask<T> extends AbstractHttpTask<T> {
+public class GetHttpTask<T> extends AbstractHttpTask<T> {
 
-  private GetTask(Builder<T> b) {
+  private GetHttpTask(Builder<T> b) {
     super(b);
   }
 
@@ -90,7 +90,7 @@ public class GetTask<T> extends AbstractHttpTask<T> {
     }
   }
 
-  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, GetTask<T>, T> {
+  public static class Builder<T> extends AbstractHttpTask.Builder<Builder<T>, GetHttpTask<T>, T> {
     public Builder(HttpClient httpClient) {
       super(httpClient);
     }
@@ -101,8 +101,8 @@ public class GetTask<T> extends AbstractHttpTask<T> {
     }
 
     @Override
-    public GetTask<T> build() {
-      return new GetTask<>(this);
+    public GetHttpTask<T> build() {
+      return new GetHttpTask<>(this);
     }
   }
 }

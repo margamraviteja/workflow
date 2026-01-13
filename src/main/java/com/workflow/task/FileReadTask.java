@@ -35,7 +35,6 @@ import java.nio.file.Path;
  *   <li>Large files are loaded entirely into memory
  *   <li>Reading is synchronous and blocking
  *   <li>Network filesystems may have significant latency
- *   <li>Wrap with {@link RetryingTask} to handle transient I/O errors
  * </ul>
  *
  * <p><b>Use Cases:</b>
@@ -80,18 +79,6 @@ import java.nio.file.Path;
  * if (result.getStatus() == WorkflowStatus.SUCCESS) {
  *     System.out.println("Import completed successfully");
  * }
- * }</pre>
- *
- * <p><b>Example Usage - With Retry For Transient Errors:</b>
- *
- * <pre>{@code
- * Task fileReadTask = new FileReadTask(Path.of("/mnt/shared/data.txt"), "fileData");
- * Task resilientRead = new RetryingTask(
- *     fileReadTask,
- *     3,                           // Max 3 attempts
- *     Duration.ofMillis(500),      // Start with 500ms backoff
- *     2.0                          // Double backoff each retry
- * );
  * }</pre>
  *
  * @see FileWriteTask

@@ -70,7 +70,7 @@ class ConditionalWorkflowTest {
         ConditionalWorkflow.builder()
             .name("false-wf")
             .condition(cond)
-            .whenTrue(null)
+            .whenTrue(WorkflowTestUtils.mockSuccessfulWorkflow())
             .whenFalse(whenFalse)
             .build();
 
@@ -84,13 +84,13 @@ class ConditionalWorkflowTest {
     WorkflowContext ctx = WorkflowTestUtils.createContext();
 
     // condition true but whenTrue is null -> should return SKIPPED
-    Predicate<WorkflowContext> cond = _ -> true;
+    Predicate<WorkflowContext> cond = _ -> false;
     ConditionalWorkflow wf =
         ConditionalWorkflow.builder()
             .name("skip-wf")
             .condition(cond)
-            .whenTrue(null)
-            .whenFalse(WorkflowTestUtils.mockSuccessfulWorkflow())
+            .whenTrue(WorkflowTestUtils.mockSuccessfulWorkflow())
+            .whenFalse(null)
             .build();
 
     WorkflowResult result = wf.execute(ctx);
@@ -170,6 +170,7 @@ class ConditionalWorkflowTest {
         ConditionalWorkflow.builder()
             .name("fail-wf")
             .condition(cond)
+            .whenTrue(WorkflowTestUtils.mockSuccessfulWorkflow())
             .whenFalse(failingBranch)
             .build();
 

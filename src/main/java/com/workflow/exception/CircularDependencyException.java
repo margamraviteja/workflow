@@ -23,7 +23,6 @@ package com.workflow.exception;
  * <ul>
  *   <li>WorkflowA contains WorkflowB, WorkflowB contains WorkflowA
  *   <li>WorkflowA contains WorkflowB, WorkflowB contains WorkflowC, WorkflowC contains WorkflowA
- *   <li>ParallelWorkflow or CompositeTask creating circular references
  * </ul>
  *
  * <p><b>How to Fix:</b>

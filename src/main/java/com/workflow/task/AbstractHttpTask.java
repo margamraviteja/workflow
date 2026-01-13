@@ -5,6 +5,7 @@ import static com.workflow.helper.ResponseMappers.defaultTypedResponseMapper;
 
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
+import com.workflow.helper.HttpTaskBodyHelper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -30,8 +31,9 @@ import java.util.function.Function;
  *   <li>Timeout configuration
  * </ul>
  *
- * <p>Concrete implementations (GetTask, PostTask, PutTask, DeleteTask) must implement {@link
- * #prepareRequest(HttpRequest.Builder, WorkflowContext)} to set the HTTP method and body as needed.
+ * <p>Concrete implementations (GetHttpTask, PostHttpTask, PutHttpTask, DeleteHttpTask) must
+ * implement {@link #prepareRequest(HttpRequest.Builder, WorkflowContext)} to set the HTTP method
+ * and body as needed.
  *
  * <p><b>Request Processing Flow:</b>
  *
@@ -57,10 +59,10 @@ import java.util.function.Function;
  * </ul>
  *
  * @param <T> response mapped type
- * @see GetTask
- * @see PostTask
- * @see PutTask
- * @see DeleteTask
+ * @see GetHttpTask
+ * @see PostHttpTask
+ * @see PutHttpTask
+ * @see DeleteHttpTask
  * @see HttpTaskBodyHelper
  * @see com.workflow.helper.ResponseMappers
  */
