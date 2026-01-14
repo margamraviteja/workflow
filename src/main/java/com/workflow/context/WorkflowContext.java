@@ -1,6 +1,7 @@
 package com.workflow.context;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.workflow.listener.WorkflowListeners;
 import java.util.Map;
 import java.util.Objects;
@@ -388,8 +389,7 @@ public class WorkflowContext {
     if (value == null) return null;
 
     // Runtime type check using raw class from TypeReference
-    Class<?> rawType = typeRef.getType() instanceof Class ? (Class<?>) typeRef.getType() : null;
-
+    Class<?> rawType = TypeFactory.defaultInstance().constructType(typeRef.getType()).getRawClass();
     if (rawType != null && !rawType.isInstance(value)) {
       throw new IllegalStateException(
           "Expected key '"
@@ -460,8 +460,8 @@ public class WorkflowContext {
    * @return a new {@link WorkflowContext} instance pre-populated with the current entries
    */
   public WorkflowContext copy() {
-    WorkflowContext newContext = new WorkflowContext();
-    newContext.context.putAll(context);
+    WorkflowContext newContext = new WorkflowContext(this.listeners);
+    newContext.context.putAll(this.context);
     return newContext;
   }
 
