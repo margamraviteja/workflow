@@ -383,6 +383,94 @@ public class RateLimitedApiExample {
 }
 ```
 
+### Chaos Engineering for Resilience Testing
+
+```java
+import com.workflow.*;
+import com.workflow.chaos.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.exception.ChaosException;
+
+public class ChaosTestingExample {
+    public void testWithFailureInjection() {
+        // Create unreliable service (30% failure rate)
+        Workflow unreliableService = ChaosWorkflow.builder()
+                .name("UnreliableAPI")
+                .workflow(apiCallWorkflow)
+                .strategy(FailureInjectionStrategy.builder()
+                        .probability(0.3)
+                        .build())
+                .build();
+
+        // Test with retry policy
+        TaskDescriptor resilientTask = TaskDescriptor.builder()
+                .task(new ExecuteWorkflowTask(unreliableService))
+                .retryPolicy(RetryPolicy.exponentialBackoff(3, Duration.ofMillis(100)))
+                .build();
+                
+        WorkflowResult result = new TaskWorkflow(resilientTask).execute(context);
+        // Should eventually succeed despite chaos
+    }
+    
+    public void testWithLatencyInjection() {
+        // Simulate slow service
+        Workflow slowService = ChaosWorkflow.builder()
+                .workflow(databaseWorkflow)
+                .strategy(LatencyInjectionStrategy.builder()
+                        .minDelayMs(500)
+                        .maxDelayMs(2000)
+                        .probability(0.5)  // 50% of requests are slow
+                        .build())
+                .build();
+
+        // Test timeout handling
+        Workflow timedWorkflow = TimeoutWorkflow.builder()
+                .workflow(slowService)
+                .timeoutMs(1000)
+                .build();
+                
+        WorkflowResult result = timedWorkflow.execute(context);
+        // Some executions will timeout
+    }
+    
+    public void testFallbackMechanism() {
+        // Primary service with high failure rate
+        Workflow unreliablePrimary = ChaosWorkflow.builder()
+                .workflow(primaryService)
+                .strategy(FailureInjectionStrategy.withProbability(0.7))
+                .build();
+
+        // Should frequently use fallback
+        Workflow resilient = FallbackWorkflow.builder()
+                .primary(unreliablePrimary)
+                .fallback(backupService)
+                .build();
+                
+        for (int i = 0; i < 100; i++) {
+            WorkflowResult result = resilient.execute(context);
+            // System remains available despite chaos
+            assertTrue(result.getStatus() == WorkflowStatus.SUCCESS);
+        }
+    }
+    
+    public void testMultipleChaosStrategies() {
+        // Combine multiple chaos strategies
+        Workflow chaosWorkflow = ChaosWorkflow.builder()
+                .workflow(serviceWorkflow)
+                .strategy(LatencyInjectionStrategy.withFixedDelay(100))
+                .strategy(FailureInjectionStrategy.withProbability(0.2))
+                .strategy(ExceptionInjectionStrategy.builder()
+                        .exceptionSupplier(() -> new IllegalStateException("Chaos!"))
+                        .probability(0.1)
+                        .build())
+                .build();
+                
+        // Test system under complex failure scenarios
+        WorkflowResult result = chaosWorkflow.execute(context);
+    }
+}
+```
+
 ### With Workflow Listeners
 
 ```java

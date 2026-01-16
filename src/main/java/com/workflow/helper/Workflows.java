@@ -1,6 +1,7 @@
 package com.workflow.helper;
 
 import com.workflow.*;
+import com.workflow.ChaosWorkflow.ChaosWorkflowBuilder;
 import com.workflow.ConditionalWorkflow.ConditionalWorkflowBuilder;
 import com.workflow.DynamicBranchingWorkflow.DynamicBranchingWorkflowBuilder;
 import com.workflow.FallbackWorkflow.FallbackWorkflowBuilder;
@@ -105,5 +106,16 @@ public class Workflows {
    */
   public static SagaWorkflowBuilder saga(String name) {
     return SagaWorkflow.builder().name(name);
+  }
+
+  /**
+   * Creates a builder for a {@link ChaosWorkflow}, which injects controlled failures, latency, and
+   * anomalies for resilience testing.
+   *
+   * @param name The unique name of the chaos workflow.
+   * @return A new {@link ChaosWorkflowBuilder} instance.
+   */
+  public static ChaosWorkflowBuilder chaos(String name) {
+    return ChaosWorkflow.builder().name(name);
   }
 }

@@ -46,7 +46,7 @@ public class WorkflowResult {
 
 ## Workflow Types
 
-The framework provides ten core workflow types:
+The framework provides eleven core workflow types:
 
 | Workflow              | Purpose              | Execution           | Use Case                  |
 |-----------------------|----------------------|---------------------|---------------------------|
@@ -60,6 +60,7 @@ The framework provides ten core workflow types:
 | **Rate Limited**      | Throttled execution  | Rate controlled     | API rate limits           |
 | **Timeout**           | Time-bounded         | With timeout        | Time constraints          |
 | **Javascript**        | Dynamic JS execution | Script-based logic  | Dynamic business rules    |
+| **Chaos**             | Resilience testing   | Chaos injection     | Testing & fault injection |
 
 ## Sequential Workflow
 
@@ -2079,6 +2080,404 @@ public void example() {
 6. **Documentation**: Document expected context inputs and outputs
 7. **Versioning**: Version your script files for audit trails
 8. **Type Safety**: Use TypeScript definitions for better IDE support (optional)
+
+## Chaos Workflow
+
+Wraps any workflow with chaos engineering strategies to test resilience, error handling, timeouts, and recovery mechanisms. Essential for validating that production systems can handle real-world failure scenarios.
+
+### Features
+
+- **Multiple Strategies**: Apply failure injection, latency, exceptions, resource exhaustion
+- **Probability-Based**: Control chaos frequency with configurable probabilities
+- **Composable**: Combine multiple strategies in sequence
+- **Observable**: Chaos events include metadata for test validation
+- **Transparent**: Wraps any workflow without modification
+
+### Builder API
+
+```
+ChaosWorkflow.builder()
+    .name(String)                          // Optional workflow name
+    .workflow(Workflow)                    // Workflow to wrap with chaos
+    .strategy(ChaosStrategy)               // Add chaos strategy
+    .strategies(List<ChaosStrategy>)       // Add multiple strategies
+    .build()
+```
+
+### Chaos Strategies
+
+#### Failure Injection Strategy
+
+Randomly injects failures based on probability:
+
+```java
+public void example() {
+    // 30% failure rate
+    ChaosStrategy strategy = FailureInjectionStrategy.builder()
+            .probability(0.3)
+            .errorMessage("Simulated service unavailable")
+            .build();
+
+    Workflow chaosWorkflow = ChaosWorkflow.builder()
+            .name("UnreliableService")
+            .workflow(apiWorkflow)
+            .strategy(strategy)
+            .build();
+
+    // Test with retry mechanism
+    TaskDescriptor resilientTask = TaskDescriptor.builder()
+            .task(new ExecuteWorkflowTask(chaosWorkflow))
+            .retryPolicy(RetryPolicy.exponentialBackoff(3, Duration.ofMillis(100)))
+            .build();
+}
+```
+
+**Convenience Methods:**
+```
+FailureInjectionStrategy.alwaysFail()               // 100% failure
+FailureInjectionStrategy.neverFail()                // 0% failure
+FailureInjectionStrategy.withProbability(0.5)       // 50% failure
+```
+
+#### Latency Injection Strategy
+
+Introduces artificial delays to test timeout handling:
+
+```java
+public void example() {
+    // Fixed 500ms delay
+    ChaosStrategy fixedDelay = LatencyInjectionStrategy.builder()
+            .minDelayMs(500)
+            .maxDelayMs(500)
+            .build();
+
+    // Random delay between 100ms and 2000ms
+    ChaosStrategy randomDelay = LatencyInjectionStrategy.builder()
+            .minDelayMs(100)
+            .maxDelayMs(2000)
+            .probability(0.5)  // 50% chance
+            .build();
+
+    Workflow slowService = ChaosWorkflow.builder()
+            .workflow(databaseWorkflow)
+            .strategy(randomDelay)
+            .build();
+
+    // Wrap with timeout to test timeout handling
+    Workflow timedWorkflow = TimeoutWorkflow.builder()
+            .workflow(slowService)
+            .timeoutMs(1000)
+            .build();
+}
+```
+
+**Convenience Methods:**
+```
+LatencyInjectionStrategy.withFixedDelay(500)        // Fixed 500ms
+LatencyInjectionStrategy.withRandomDelay(100, 2000) // Random 100-2000ms
+```
+
+#### Exception Injection Strategy
+
+Throws specific exceptions to test error handling:
+
+```java
+public void example() {
+    // Throw NullPointerException
+    ChaosStrategy npeStrategy = ExceptionInjectionStrategy.builder()
+            .exceptionSupplier(() -> new NullPointerException("Simulated NPE"))
+            .probability(0.2)
+            .build();
+
+    // Throw custom business exception
+    ChaosStrategy businessException = ExceptionInjectionStrategy.builder()
+            .exceptionSupplier(() -> 
+                new InsufficientFundsException("Account overdrawn"))
+            .probability(0.1)
+            .build();
+
+    Workflow chaosWorkflow = ChaosWorkflow.builder()
+            .workflow(paymentWorkflow)
+            .strategy(businessException)
+            .build();
+}
+```
+
+**Convenience Methods:**
+```
+ExceptionInjectionStrategy.alwaysThrow(exception)
+ExceptionInjectionStrategy.throwWithProbability(exception, 0.3)
+```
+
+#### Resource Exhaustion Strategy
+
+Simulates resource constraints (memory, CPU, threads):
+
+```java
+public void example() {
+    // Simulate memory pressure
+    ChaosStrategy memoryPressure = ResourceExhaustionStrategy.builder()
+            .resourceType(ResourceType.MEMORY)
+            .intensity(Intensity.MEDIUM)
+            .throwException(true)
+            .build();
+
+    // Simulate CPU exhaustion
+    ChaosStrategy cpuExhaustion = ResourceExhaustionStrategy.builder()
+            .resourceType(ResourceType.CPU)
+            .intensity(Intensity.LOW)
+            .throwException(false)  // Just slow down
+            .build();
+
+    Workflow chaosWorkflow = ChaosWorkflow.builder()
+            .workflow(serviceWorkflow)
+            .strategy(memoryPressure)
+            .build();
+}
+```
+
+**Convenience Methods:**
+```
+ResourceExhaustionStrategy.memoryPressure(Intensity.HIGH)
+ResourceExhaustionStrategy.cpuExhaustion(Intensity.MEDIUM)
+```
+
+### Multiple Strategies
+
+Compose multiple chaos strategies to simulate complex failure scenarios:
+
+```java
+public void example() {
+    Workflow chaosWorkflow = ChaosWorkflow.builder()
+            .name("MultiChaos")
+            .workflow(serviceWorkflow)
+            .strategy(LatencyInjectionStrategy.withFixedDelay(100))
+            .strategy(FailureInjectionStrategy.withProbability(0.2))
+            .strategy(ExceptionInjectionStrategy.builder()
+                    .exceptionSupplier(() -> new IllegalStateException("Chaos!"))
+                    .probability(0.1)
+                    .build())
+            .build();
+}
+```
+
+### Real-World Examples
+
+#### Testing Retry Policies
+
+```java
+public void example() {
+    // Create unreliable service
+    Workflow unreliableService = ChaosWorkflow.builder()
+            .name("UnreliableAPI")
+            .workflow(apiCallWorkflow)
+            .strategy(FailureInjectionStrategy.withProbability(0.7))
+            .build();
+
+    // Wrap with retry policy
+    TaskDescriptor resilientCall = TaskDescriptor.builder()
+            .task(new ExecuteWorkflowTask(unreliableService))
+            .retryPolicy(RetryPolicy.exponentialBackoff(5, Duration.ofMillis(100)))
+            .build();
+
+    // Should eventually succeed despite 70% failure rate
+    WorkflowResult result = new TaskWorkflow(resilientCall).execute(context);
+}
+```
+
+#### Testing Fallback Mechanisms
+
+```java
+public void example() {
+    // Primary service with high failure rate
+    Workflow unreliablePrimary = ChaosWorkflow.builder()
+            .workflow(primaryService)
+            .strategy(FailureInjectionStrategy.withProbability(0.8))
+            .build();
+
+    // Fallback should frequently activate
+    Workflow resilient = FallbackWorkflow.builder()
+            .name("ResilientService")
+            .primary(unreliablePrimary)
+            .fallback(backupService)
+            .build();
+
+    // Verify fallback usage
+    for (int i = 0; i < 100; i++) {
+        WorkflowResult result = resilient.execute(context);
+        assertTrue(result.getStatus() == WorkflowStatus.SUCCESS);
+    }
+}
+```
+
+#### Testing Timeout Handling
+
+```java
+public void example() {
+    // Service with unpredictable latency
+    Workflow slowService = ChaosWorkflow.builder()
+            .workflow(databaseQuery)
+            .strategy(LatencyInjectionStrategy.withRandomDelay(100, 3000))
+            .build();
+
+    // Test timeout enforcement
+    Workflow timedService = TimeoutWorkflow.builder()
+            .workflow(slowService)
+            .timeoutMs(1000)
+            .build();
+
+    // Some executions will timeout
+    int timeouts = 0;
+    for (int i = 0; i < 50; i++) {
+        WorkflowResult result = timedService.execute(context);
+        if (result.getStatus() == WorkflowStatus.FAILED) {
+            timeouts++;
+        }
+    }
+    
+    assertTrue(timeouts > 0, "Expected some timeouts");
+}
+```
+
+#### Testing Saga Compensation
+
+```java
+public void example() {
+    // Inject failures in saga step to test compensation
+    Workflow chaoticPayment = ChaosWorkflow.builder()
+            .workflow(processPaymentWorkflow)
+            .strategy(FailureInjectionStrategy.withProbability(0.5))
+            .build();
+
+    Workflow orderSaga = SagaWorkflow.builder()
+            .name("OrderSaga")
+            .step(reserveInventoryTask, releaseInventoryTask)
+            .step(chaoticPayment, refundTask)  // Will frequently fail
+            .step(notificationTask, cancelNotificationTask)
+            .build();
+
+    // Verify compensation runs when payment fails
+    WorkflowResult result = orderSaga.execute(context);
+    
+    if (result.getStatus() == WorkflowStatus.FAILED) {
+        // Check that inventory was released (compensated)
+        assertTrue(context.getTyped("inventoryReleased", Boolean.class));
+    }
+}
+```
+
+#### Performance Degradation Testing
+
+```java
+public void example() {
+    // Simulate gradual performance degradation
+    Workflow degradedService = ChaosWorkflow.builder()
+            .name("DegradedService")
+            .workflow(serviceWorkflow)
+            .strategy(LatencyInjectionStrategy.builder()
+                    .minDelayMs(1000)
+                    .maxDelayMs(5000)
+                    .probability(1.0)
+                    .build())
+            .build();
+
+    // Measure and verify performance impact
+    Instant start = Instant.now();
+    WorkflowResult result = degradedService.execute(context);
+    Duration duration = Duration.between(start, Instant.now());
+    
+    assertTrue(duration.toMillis() >= 1000, 
+        "Expected at least 1 second delay");
+}
+```
+
+#### Chaos in Integration Tests
+
+```java
+@Test
+void testSystemResilience() {
+    // Test entire system with chaos
+    Workflow chaosOrderProcessing = SequentialWorkflow.builder()
+            .name("ChaosOrderTest")
+            .workflow(ChaosWorkflow.builder()
+                    .workflow(validateOrder)
+                    .strategy(FailureInjectionStrategy.withProbability(0.1))
+                    .build())
+            .workflow(ChaosWorkflow.builder()
+                    .workflow(processPayment)
+                    .strategy(LatencyInjectionStrategy.withRandomDelay(100, 500))
+                    .build())
+            .workflow(ChaosWorkflow.builder()
+                    .workflow(fulfillOrder)
+                    .strategy(FailureInjectionStrategy.withProbability(0.05))
+                    .build())
+            .build();
+
+    // System should handle chaos gracefully
+    WorkflowResult result = chaosOrderProcessing.execute(context);
+    
+    // Verify either success or proper error handling
+    if (result.getStatus() == WorkflowStatus.FAILED) {
+        assertNotNull(result.getError());
+        assertTrue(result.getError() instanceof ChaosException);
+    }
+}
+```
+
+### Best Practices
+
+1. **Start Small**: Begin with low probabilities (10-20%) and gradually increase
+2. **Feature Flags**: Use flags to enable/disable chaos in different environments
+3. **Monitor Metadata**: Check `ChaosException` metadata for debugging
+4. **Combine Strategies**: Test multiple failure modes together
+5. **Isolated Tests**: Test each resilience mechanism (retry, timeout, fallback) separately
+6. **Production Safety**: Never enable chaos in production unless intentionally testing
+7. **Reproducibility**: Use seeded random generators for reproducible tests
+8. **Observability**: Integrate with monitoring tools to track chaos events
+
+### Chaos Exception Metadata
+
+All chaos exceptions include metadata for test validation:
+
+```java
+public void example() {
+    try {
+        chaosWorkflow.execute(context);
+    } catch (ChaosException e) {
+        // Access chaos metadata
+        String strategy = (String) e.getMetadata("strategy");
+        Double probability = (Double) e.getMetadata("probability");
+
+        assertEquals("FailureInjection", strategy);
+        assertTrue(e.isChaosInjected());
+
+        Map<String, Object> allMetadata = e.getAllMetadata();
+        System.out.println("Chaos metadata: " + allMetadata);
+    }
+}
+```
+
+### Thread Safety
+
+All built-in chaos strategies are thread-safe and can be safely used in parallel workflows:
+
+```java
+public void example() {
+    // Shared chaos strategy across parallel workflows
+    ChaosStrategy sharedChaos = FailureInjectionStrategy.withProbability(0.3);
+
+    Workflow parallel = ParallelWorkflow.builder()
+            .workflow(ChaosWorkflow.builder()
+                    .workflow(workflow1)
+                    .strategy(sharedChaos)
+                    .build())
+            .workflow(ChaosWorkflow.builder()
+                    .workflow(workflow2)
+                    .strategy(sharedChaos)
+                    .build())
+            .build();
+}
+```
 
 ## Workflow Composition
 
