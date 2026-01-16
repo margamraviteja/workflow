@@ -57,20 +57,20 @@ public class WebhookProcessingExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var payload = context.get('payload');
-                    var signature = context.get('signature');
-                    var secret = context.get('webhookSecret');
+                    var payload = ctx.get('payload');
+                    var signature = ctx.get('signature');
+                    var secret = ctx.get('webhookSecret');
 
                     // Simulate HMAC-SHA256 verification
                     // In production, use crypto library
                     var expectedSignature = 'sha256=' + signature.substring(7);
 
                     var isValid = signature === expectedSignature;
-                    context.put('signatureValid', isValid);
+                    ctx.put('signatureValid', isValid);
 
                     if (!isValid) {
-                        context.put('error', 'Invalid webhook signature');
-                        context.put('statusCode', 401);
+                        ctx.put('error', 'Invalid webhook signature');
+                        ctx.put('statusCode', 401);
                     }
                     """))
             .build();
@@ -81,11 +81,11 @@ public class WebhookProcessingExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var payload = JSON.parse(context.get('payload'));
-                    var event = context.get('githubEvent');
+                    var payload = JSON.parse(ctx.get('payload'));
+                    var event = ctx.get('githubEvent');
 
-                    context.put('eventType', event);
-                    context.put('parsedPayload', payload);
+                    ctx.put('eventType', event);
+                    ctx.put('parsedPayload', payload);
 
                     // Extract common metadata
                     var metadata = {
@@ -94,7 +94,7 @@ public class WebhookProcessingExample {
                         timestamp: payload.created_at || new Date().toISOString()
                     };
 
-                    context.put('metadata', metadata);
+                    ctx.put('metadata', metadata);
                     """))
             .build();
 
@@ -102,7 +102,7 @@ public class WebhookProcessingExample {
         createSimpleWorkflow(
             "HandlePushEvent",
             """
-            var payload = context.get('parsedPayload');
+            var payload = ctx.get('parsedPayload');
 
             var commits = payload.commits || [];
             var branch = payload.ref?.replace('refs/heads/', '');
@@ -116,16 +116,16 @@ public class WebhookProcessingExample {
                 removed: commits.reduce((sum, c) => sum + (c.removed?.length || 0), 0)
             };
 
-            context.put('eventSummary', summary);
-            context.put('statusCode', 200);
-            context.put('response', { status: 'processed', type: 'push' });
+            ctx.put('eventSummary', summary);
+            ctx.put('statusCode', 200);
+            ctx.put('response', { status: 'processed', type: 'push' });
             """);
 
     var prEventHandler =
         createSimpleWorkflow(
             "HandlePullRequestEvent",
             """
-            var payload = context.get('parsedPayload');
+            var payload = ctx.get('parsedPayload');
             var pr = payload.pull_request;
 
             var summary = {
@@ -139,9 +139,9 @@ public class WebhookProcessingExample {
                 deletions: pr.deletions
             };
 
-            context.put('eventSummary', summary);
-            context.put('statusCode', 200);
-            context.put('response', { status: 'processed', type: 'pull_request' });
+            ctx.put('eventSummary', summary);
+            ctx.put('statusCode', 200);
+            ctx.put('response', { status: 'processed', type: 'pull_request' });
             """);
 
     Workflow githubWebhook =
@@ -162,16 +162,16 @@ public class WebhookProcessingExample {
                                     .defaultBranch(
                                         createSimpleWorkflow(
                                             "DefaultHandler",
-                                            "context.put('statusCode', 200); "
-                                                + "context.put('response', { status:"
+                                            "ctx.put('statusCode', 200); "
+                                                + "ctx.put('response', { status:"
                                                 + " 'ignored' });"))
                                     .build())
                             .build())
                     .whenFalse(
                         createSimpleWorkflow(
                             "Unauthorized",
-                            "context.put('statusCode', 401); "
-                                + "context.put('response', { error: 'Invalid signature' });"))
+                            "ctx.put('statusCode', 401); "
+                                + "ctx.put('response', { error: 'Invalid signature' });"))
                     .build())
             .build();
 
@@ -215,22 +215,22 @@ public class WebhookProcessingExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var payload = JSON.parse(context.get('payload'));
-                    var processedEvents = context.get('processedEvents') || [];
+                    var payload = JSON.parse(ctx.get('payload'));
+                    var processedEvents = ctx.get('processedEvents') || [];
 
                     // Idempotency check
                     var isDuplicate = processedEvents.includes(payload.id);
                     if (isDuplicate) {
-                        context.put('isDuplicate', true);
-                        context.put('statusCode', 200);
-                        context.put('response', { status: 'duplicate', id: payload.id });
+                        ctx.put('isDuplicate', true);
+                        ctx.put('statusCode', 200);
+                        ctx.put('response', { status: 'duplicate', id: payload.id });
                         return;
                     }
 
-                    context.put('isDuplicate', false);
-                    context.put('eventId', payload.id);
-                    context.put('eventType', payload.type);
-                    context.put('eventData', payload.data);
+                    ctx.put('isDuplicate', false);
+                    ctx.put('eventId', payload.id);
+                    ctx.put('eventType', payload.type);
+                    ctx.put('eventData', payload.data);
                     """))
             .build();
 
@@ -238,7 +238,7 @@ public class WebhookProcessingExample {
         createSimpleWorkflow(
             "HandlePaymentSucceeded",
             """
-            var eventData = context.get('eventData');
+            var eventData = ctx.get('eventData');
             var payment = eventData.object;
 
             var result = {
@@ -249,21 +249,21 @@ public class WebhookProcessingExample {
                 receiptEmail: payment.receipt_email
             };
 
-            context.put('paymentResult', result);
-            context.put('statusCode', 200);
-            context.put('response', { status: 'processed', type: 'payment.succeeded' });
+            ctx.put('paymentResult', result);
+            ctx.put('statusCode', 200);
+            ctx.put('response', { status: 'processed', type: 'payment.succeeded' });
 
             // Mark as processed
-            var processed = context.get('processedEvents') || [];
-            processed.push(context.get('eventId'));
-            context.put('processedEvents', processed);
+            var processed = ctx.get('processedEvents') || [];
+            processed.push(ctx.get('eventId'));
+            ctx.put('processedEvents', processed);
             """);
 
     var paymentFailedHandler =
         createSimpleWorkflow(
             "HandlePaymentFailed",
             """
-            var eventData = context.get('eventData');
+            var eventData = ctx.get('eventData');
             var payment = eventData.object;
 
             var result = {
@@ -273,14 +273,14 @@ public class WebhookProcessingExample {
                 failureMessage: payment.failure_message
             };
 
-            context.put('paymentResult', result);
-            context.put('statusCode', 200);
-            context.put('response', { status: 'processed', type: 'payment.failed' });
+            ctx.put('paymentResult', result);
+            ctx.put('statusCode', 200);
+            ctx.put('response', { status: 'processed', type: 'payment.failed' });
 
             // Mark as processed
-            var processed = context.get('processedEvents') || [];
-            processed.push(context.get('eventId'));
-            context.put('processedEvents', processed);
+            var processed = ctx.get('processedEvents') || [];
+            processed.push(ctx.get('eventId'));
+            ctx.put('processedEvents', processed);
             """);
 
     Workflow stripeWebhook =
@@ -298,8 +298,8 @@ public class WebhookProcessingExample {
                             .defaultBranch(
                                 createSimpleWorkflow(
                                     "DefaultHandler",
-                                    "context.put('statusCode', 200); "
-                                        + "context.put('response', { status: 'ignored' });"))
+                                    "ctx.put('statusCode', 200); "
+                                        + "ctx.put('response', { status: 'ignored' });"))
                             .build())
                     .build())
             .build();
@@ -346,8 +346,8 @@ public class WebhookProcessingExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var source = context.get('source');
-                    var payload = JSON.parse(context.get('payload'));
+                    var source = ctx.get('source');
+                    var payload = JSON.parse(ctx.get('payload'));
 
                     // Extract normalized event data
                     var normalizedEvent = {
@@ -359,7 +359,7 @@ public class WebhookProcessingExample {
 
                     switch(source) {
                         case 'github':
-                            normalizedEvent.eventType = context.get('githubEvent');
+                            normalizedEvent.eventType = ctx.get('githubEvent');
                             normalizedEvent.data = {
                                 repository: payload.repository?.full_name,
                                 action: payload.action,
@@ -375,7 +375,7 @@ public class WebhookProcessingExample {
                             };
                             break;
                         case 'shopify':
-                            normalizedEvent.eventType = context.get('shopifyTopic');
+                            normalizedEvent.eventType = ctx.get('shopifyTopic');
                             normalizedEvent.data = {
                                 orderId: payload.id,
                                 customer: payload.customer,
@@ -384,8 +384,8 @@ public class WebhookProcessingExample {
                             break;
                     }
 
-                    context.put('normalizedEvent', normalizedEvent);
-                    context.put('routeKey', source + '.' + normalizedEvent.eventType);
+                    ctx.put('normalizedEvent', normalizedEvent);
+                    ctx.put('routeKey', source + '.' + normalizedEvent.eventType);
                     """))
             .build();
 
@@ -395,7 +395,7 @@ public class WebhookProcessingExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var event = context.get('normalizedEvent');
+                    var event = ctx.get('normalizedEvent');
 
                     // Simulate processing
                     var processed = {
@@ -407,8 +407,8 @@ public class WebhookProcessingExample {
                         status: 'processed'
                     };
 
-                    context.put('processedEvent', processed);
-                    context.put('statusCode', 200);
+                    ctx.put('processedEvent', processed);
+                    ctx.put('statusCode', 200);
                     """))
             .build();
 

@@ -65,7 +65,7 @@ public class RealTimeDataProcessingExample {
     ScriptProvider anomalyScript =
         new InlineScriptProvider(
             """
-            var metrics = context.get('metrics');
+            var metrics = ctx.get('metrics');
 
             // Calculate mean
             var sum = metrics.reduce((acc, m) => acc + m.value, 0);
@@ -83,11 +83,11 @@ public class RealTimeDataProcessingExample {
                 return zScore > threshold;
             });
 
-            context.put('mean', mean);
-            context.put('stdDev', stdDev);
-            context.put('anomalies', anomalies);
-            context.put('anomalyCount', anomalies.length);
-            context.put('anomalyRate', anomalies.length / metrics.length);
+            ctx.put('mean', mean);
+            ctx.put('stdDev', stdDev);
+            ctx.put('anomalies', anomalies);
+            ctx.put('anomalyCount', anomalies.length);
+            ctx.put('anomalyRate', anomalies.length / metrics.length);
             """);
 
     JavascriptWorkflow workflow =
@@ -128,8 +128,8 @@ public class RealTimeDataProcessingExample {
     ScriptProvider streamScript =
         new InlineScriptProvider(
             """
-            var events = context.get('events');
-            var windowSize = context.get('windowSize') || 5;
+            var events = ctx.get('events');
+            var windowSize = ctx.get('windowSize') || 5;
 
             // Calculate moving averages with sliding window
             var movingAverages = [];
@@ -161,9 +161,9 @@ public class RealTimeDataProcessingExample {
                 else if (decreasing) trend = 'DECREASING';
             }
 
-            context.put('movingAverages', movingAverages);
-            context.put('trend', trend);
-            context.put('latestAverage', movingAverages[movingAverages.length - 1].average);
+            ctx.put('movingAverages', movingAverages);
+            ctx.put('trend', trend);
+            ctx.put('latestAverage', movingAverages[movingAverages.length - 1].average);
             """);
 
     JavascriptWorkflow workflow =
@@ -204,7 +204,7 @@ public class RealTimeDataProcessingExample {
     ScriptProvider aggregationScript =
         new InlineScriptProvider(
             """
-            var metrics = context.get('metrics');
+            var metrics = ctx.get('metrics');
 
             // Group by region
             var byRegion = metrics.reduce((acc, m) => {
@@ -257,17 +257,17 @@ public class RealTimeDataProcessingExample {
                 return sorted[index];
             }
 
-            context.put('regionStats', regionStats);
-            context.put('serviceStats', byService);
-            context.put('overallErrorRate', totalErrors / totalRequests);
-            context.put('overallAvgLatency', avgLatency);
-            context.put('totalRequests', totalRequests);
+            ctx.put('regionStats', regionStats);
+            ctx.put('serviceStats', byService);
+            ctx.put('overallErrorRate', totalErrors / totalRequests);
+            ctx.put('overallAvgLatency', avgLatency);
+            ctx.put('totalRequests', totalRequests);
             """);
 
     ScriptProvider alertScript =
         new InlineScriptProvider(
             """
-            var regionStats = context.get('regionStats');
+            var regionStats = ctx.get('regionStats');
             var errorThreshold = 0.05; // 5% error rate
             var latencyThreshold = 200; // 200ms
 
@@ -287,8 +287,8 @@ public class RealTimeDataProcessingExample {
                     ].filter(x => x != null)
                 }));
 
-            context.put('alerts', alerts);
-            context.put('alertCount', alerts.length);
+            ctx.put('alerts', alerts);
+            ctx.put('alertCount', alerts.length);
             """);
 
     Workflow metricsWorkflow =

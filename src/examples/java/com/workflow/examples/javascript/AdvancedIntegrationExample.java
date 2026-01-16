@@ -64,7 +64,7 @@ public class AdvancedIntegrationExample {
     ScriptProvider conditionScript =
         new InlineScriptProvider(
             """
-            var order = context.get('order');
+            var order = ctx.get('order');
 
             // Complex eligibility logic
             var isPremium = order.customerTier === 'PREMIUM';
@@ -77,8 +77,8 @@ public class AdvancedIntegrationExample {
                 (hasMultipleItems && isFrequentBuyer) ||
                 (isHighValue && isFrequentBuyer);
 
-            context.put('eligibleForFastTrack', eligibleForFastTrack);
-            context.put('reason', eligibleForFastTrack ?
+            ctx.put('eligibleForFastTrack', eligibleForFastTrack);
+            ctx.put('reason', eligibleForFastTrack ?
                 'Customer meets fast-track criteria' :
                 'Standard processing required');
             """);
@@ -143,7 +143,7 @@ public class AdvancedIntegrationExample {
     ScriptProvider routingScript =
         new InlineScriptProvider(
             """
-            var request = context.get('request');
+            var request = ctx.get('request');
             var route;
 
             // Routing logic
@@ -159,8 +159,8 @@ public class AdvancedIntegrationExample {
                 route = 'standard';
             }
 
-            context.put('selectedRoute', route);
-            context.put('routingReason', getRoutingReason(request, route));
+            ctx.put('selectedRoute', route);
+            ctx.put('routingReason', getRoutingReason(request, route));
 
             function getRoutingReason(req, route) {
                 switch(route) {
@@ -225,7 +225,7 @@ public class AdvancedIntegrationExample {
         createTenantWorkflow(
             "ACME",
             """
-        var data = context.get('data');
+        var data = ctx.get('data');
         // ACME Corp specific rules
         var processed = {
             tenant: 'ACME',
@@ -233,14 +233,14 @@ public class AdvancedIntegrationExample {
             discountRate: 0.15,
             approved: data.value < 50000
         };
-        context.put('result', processed);
+        ctx.put('result', processed);
         """);
 
     Workflow processTenant2 =
         createTenantWorkflow(
             "GLOBEX",
             """
-        var data = context.get('data');
+        var data = ctx.get('data');
         // Globex Corp specific rules
         var processed = {
             tenant: 'GLOBEX',
@@ -248,7 +248,7 @@ public class AdvancedIntegrationExample {
             discountRate: 0.10,
             approved: data.value < 100000
         };
-        context.put('result', processed);
+        ctx.put('result', processed);
         """);
 
     // Process for different tenants
@@ -274,8 +274,8 @@ public class AdvancedIntegrationExample {
     ScriptProvider abTestScript =
         new InlineScriptProvider(
             """
-            var userId = context.get('userId');
-            var experimentId = context.get('experimentId');
+            var userId = ctx.get('userId');
+            var experimentId = ctx.get('experimentId');
 
             // Deterministic hash-based assignment
             function hashCode(str) {
@@ -298,9 +298,9 @@ public class AdvancedIntegrationExample {
                 variant = 'B';  // Treatment
             }
 
-            context.put('variant', variant);
-            context.put('bucket', bucket);
-            context.put('assignment', {
+            ctx.put('variant', variant);
+            ctx.put('bucket', bucket);
+            ctx.put('assignment', {
                 userId: userId,
                 experimentId: experimentId,
                 variant: variant,

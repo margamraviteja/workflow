@@ -66,7 +66,7 @@ public class MachineLearningEvaluationExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var predictions = context.get('predictions');
+                    var predictions = ctx.get('predictions');
 
                     // Calculate confusion matrix
                     var tp = 0, fp = 0, tn = 0, fn = 0;
@@ -81,10 +81,10 @@ public class MachineLearningEvaluationExample {
                         else if (actual === 1 && predicted === 0) fn++;
                     });
 
-                    context.put('truePositives', tp);
-                    context.put('falsePositives', fp);
-                    context.put('trueNegatives', tn);
-                    context.put('falseNegatives', fn);
+                    ctx.put('truePositives', tp);
+                    ctx.put('falsePositives', fp);
+                    ctx.put('trueNegatives', tn);
+                    ctx.put('falseNegatives', fn);
                     """))
             .build();
 
@@ -94,10 +94,10 @@ public class MachineLearningEvaluationExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var tp = context.get('truePositives');
-                    var fp = context.get('falsePositives');
-                    var tn = context.get('trueNegatives');
-                    var fn = context.get('falseNegatives');
+                    var tp = ctx.get('truePositives');
+                    var fp = ctx.get('falsePositives');
+                    var tn = ctx.get('trueNegatives');
+                    var fn = ctx.get('falseNegatives');
 
                     var total = tp + fp + tn + fn;
 
@@ -112,12 +112,12 @@ public class MachineLearningEvaluationExample {
                     var mcc = ((tp * tn) - (fp * fn)) /
                         Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
 
-                    context.put('accuracy', accuracy);
-                    context.put('precision', precision);
-                    context.put('recall', recall);
-                    context.put('f1Score', f1Score);
-                    context.put('specificity', specificity);
-                    context.put('mcc', mcc);
+                    ctx.put('accuracy', accuracy);
+                    ctx.put('precision', precision);
+                    ctx.put('recall', recall);
+                    ctx.put('f1Score', f1Score);
+                    ctx.put('specificity', specificity);
+                    ctx.put('mcc', mcc);
                     """))
             .build();
 
@@ -127,7 +127,7 @@ public class MachineLearningEvaluationExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var predictions = context.get('predictions');
+                    var predictions = ctx.get('predictions');
 
                     // Sort by predicted probability (descending)
                     var sorted = predictions
@@ -162,8 +162,8 @@ public class MachineLearningEvaluationExample {
                         auc += width * height;
                     }
 
-                    context.put('rocPoints', rocPoints);
-                    context.put('auc', auc);
+                    ctx.put('rocPoints', rocPoints);
+                    ctx.put('auc', auc);
                     """))
             .build();
 
@@ -222,7 +222,7 @@ public class MachineLearningEvaluationExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var models = context.get('models');
+                    var models = ctx.get('models');
 
                     // Rank models by multiple criteria
                     var ranked = models.map(model => {
@@ -255,19 +255,19 @@ public class MachineLearningEvaluationExample {
                     var threshold = bestModel.compositeScore * 0.95;
                     var topModels = ranked.filter(m => m.compositeScore >= threshold);
 
-                    context.put('rankedModels', ranked);
-                    context.put('bestModel', bestModel);
-                    context.put('topModels', topModels);
+                    ctx.put('rankedModels', ranked);
+                    ctx.put('bestModel', bestModel);
+                    ctx.put('topModels', topModels);
 
                     // Performance analysis
                     var avgAccuracy = models.reduce((sum, m) => sum + m.accuracy, 0) / models.length;
                     var maxAccuracy = Math.max(...models.map(m => m.accuracy));
                     var minAccuracy = Math.min(...models.map(m => m.accuracy));
 
-                    context.put('avgAccuracy', avgAccuracy);
-                    context.put('maxAccuracy', maxAccuracy);
-                    context.put('minAccuracy', minAccuracy);
-                    context.put('accuracyRange', maxAccuracy - minAccuracy);
+                    ctx.put('avgAccuracy', avgAccuracy);
+                    ctx.put('maxAccuracy', maxAccuracy);
+                    ctx.put('minAccuracy', minAccuracy);
+                    ctx.put('accuracyRange', maxAccuracy - minAccuracy);
                     """))
             .build();
 
@@ -344,7 +344,7 @@ public class MachineLearningEvaluationExample {
             .scriptProvider(
                 new InlineScriptProvider(
                     """
-                    var features = context.get('features');
+                    var features = ctx.get('features');
 
                     // Sort by importance (descending)
                     var sorted = features
@@ -381,11 +381,11 @@ public class MachineLearningEvaluationExample {
                         return acc;
                     }, {});
 
-                    context.put('sortedFeatures', enriched);
-                    context.put('topFeatures', topFeatures);
-                    context.put('featuresByCategory', byCategory);
-                    context.put('totalFeatures', features.length);
-                    context.put('topFeatureCount', topFeatures.length);
+                    ctx.put('sortedFeatures', enriched);
+                    ctx.put('topFeatures', topFeatures);
+                    ctx.put('featuresByCategory', byCategory);
+                    ctx.put('totalFeatures', features.length);
+                    ctx.put('topFeatureCount', topFeatures.length);
                     """))
             .build();
 

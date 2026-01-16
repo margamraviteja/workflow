@@ -57,7 +57,7 @@ public class DataTransformationExample {
     ScriptProvider transformScript =
         new InlineScriptProvider(
             """
-            var apiResponse = JSON.parse(context.get('apiResponse'));
+            var apiResponse = JSON.parse(ctx.get('apiResponse'));
 
             // Transform from external API format to internal model
             var transformed = apiResponse.results.map(user => ({
@@ -68,8 +68,8 @@ public class DataTransformationExample {
                 registeredDate: user.metadata.createdAt
             }));
 
-            context.put('users', transformed);
-            context.put('userCount', transformed.length);
+            ctx.put('users', transformed);
+            ctx.put('userCount', transformed.length);
             """);
 
     JavascriptWorkflow workflow =
@@ -122,7 +122,7 @@ public class DataTransformationExample {
     ScriptProvider filterScript =
         new InlineScriptProvider(
             """
-            var orders = context.get('orders');
+            var orders = ctx.get('orders');
 
             // Filter and categorize
             var paid = orders.filter(o => o.status === 'PAID');
@@ -146,9 +146,9 @@ public class DataTransformationExample {
                 highValueOrders: paid.filter(o => o.amount > 1000).length
             };
 
-            context.put('paidOrders', paid);
-            context.put('pendingOrders', pending);
-            context.put('statistics', stats);
+            ctx.put('paidOrders', paid);
+            ctx.put('pendingOrders', pending);
+            ctx.put('statistics', stats);
             """);
 
     JavascriptWorkflow workflow =
@@ -184,7 +184,7 @@ public class DataTransformationExample {
     ScriptProvider enrichScript =
         new InlineScriptProvider(
             """
-            var products = context.get('products');
+            var products = ctx.get('products');
 
             // Enrich each product with computed fields
             var enriched = products.map(product => {
@@ -219,7 +219,7 @@ public class DataTransformationExample {
                 return 'HIGH';
             }
 
-            context.put('enrichedProducts', enriched);
+            ctx.put('enrichedProducts', enriched);
             """);
 
     JavascriptWorkflow workflow =
@@ -252,7 +252,7 @@ public class DataTransformationExample {
     ScriptProvider flattenScript =
         new InlineScriptProvider(
             """
-            var response = JSON.parse(context.get('nestedData'));
+            var response = JSON.parse(ctx.get('nestedData'));
             var flattened = [];
 
             // Flatten nested structure: user -> orders -> items
@@ -276,8 +276,8 @@ public class DataTransformationExample {
                 });
             });
 
-            context.put('flattenedData', flattened);
-            context.put('recordCount', flattened.length);
+            ctx.put('flattenedData', flattened);
+            ctx.put('recordCount', flattened.length);
             """);
 
     JavascriptWorkflow workflow =
@@ -345,17 +345,17 @@ public class DataTransformationExample {
     ScriptProvider extractScript =
         new InlineScriptProvider(
             """
-            var rawData = context.get('rawData');
+            var rawData = ctx.get('rawData');
             var parsed = JSON.parse(rawData);
-            context.put('extractedData', parsed.data);
-            context.put('extractedCount', parsed.data.length);
+            ctx.put('extractedData', parsed.data);
+            ctx.put('extractedCount', parsed.data.length);
             """);
 
     // Step 2: Transform and clean
     ScriptProvider transformScript =
         new InlineScriptProvider(
             """
-            var data = context.get('extractedData');
+            var data = ctx.get('extractedData');
 
             // Clean and transform
             var transformed = data
@@ -369,16 +369,16 @@ public class DataTransformationExample {
                     processedAt: new Date().toISOString()
                 }));
 
-            context.put('transformedData', transformed);
-            context.put('transformedCount', transformed.length);
-            context.put('filteredCount', data.length - transformed.length);
+            ctx.put('transformedData', transformed);
+            ctx.put('transformedCount', transformed.length);
+            ctx.put('filteredCount', data.length - transformed.length);
             """);
 
     // Step 3: Aggregate and summarize
     ScriptProvider loadScript =
         new InlineScriptProvider(
             """
-            var data = context.get('transformedData');
+            var data = ctx.get('transformedData');
 
             // Group by category and calculate totals
             var summary = data.reduce((acc, record) => {
@@ -396,8 +396,8 @@ public class DataTransformationExample {
                 return acc;
             }, {});
 
-            context.put('summary', Object.values(summary));
-            context.put('totalAmount', data.reduce((sum, r) => sum + r.amount, 0));
+            ctx.put('summary', Object.values(summary));
+            ctx.put('totalAmount', data.reduce((sum, r) => sum + r.amount, 0));
             """);
 
     // Build ETL pipeline

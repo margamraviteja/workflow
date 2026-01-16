@@ -78,7 +78,7 @@ public class DynamicBusinessRulesExample {
     // Create risk assessment script
     String riskScript =
         """
-        var order = JSON.parse(context.get('orderJson'));
+        var order = JSON.parse(ctx.get('orderJson'));
         var riskScore = 0;
         var riskFactors = [];
 
@@ -129,10 +129,10 @@ public class DynamicBusinessRulesExample {
         }
 
         // Store results
-        context.put('riskScore', riskScore);
-        context.put('riskFactors', riskFactors);
-        context.put('action', action);
-        context.put('requiresReview', action === 'MANUAL_REVIEW');
+        ctx.put('riskScore', riskScore);
+        ctx.put('riskFactors', riskFactors);
+        ctx.put('action', action);
+        ctx.put('requiresReview', action === 'MANUAL_REVIEW');
         """;
 
     Path riskScriptPath = scriptsDir.resolve("risk_assessment.js");
@@ -196,10 +196,10 @@ public class DynamicBusinessRulesExample {
     // Version 1: Simple pricing
     String pricingV1 =
         """
-        var basePrice = context.get('basePrice');
+        var basePrice = ctx.get('basePrice');
         var finalPrice = basePrice * 1.1; // 10% markup
-        context.put('finalPrice', finalPrice);
-        context.put('version', 'v1');
+        ctx.put('finalPrice', finalPrice);
+        ctx.put('version', 'v1');
         """;
 
     Files.writeString(pricingScriptPath, pricingV1);
@@ -221,8 +221,8 @@ public class DynamicBusinessRulesExample {
     // Update to version 2: Complex pricing with tiers
     String pricingV2 =
         """
-        var basePrice = context.get('basePrice');
-        var customerTier = context.get('customerTier') || 'STANDARD';
+        var basePrice = ctx.get('basePrice');
+        var customerTier = ctx.get('customerTier') || 'STANDARD';
 
         var markup = 1.1; // Default 10%
 
@@ -239,9 +239,9 @@ public class DynamicBusinessRulesExample {
         }
 
         var finalPrice = basePrice * markup;
-        context.put('finalPrice', Math.round(finalPrice * 100) / 100);
-        context.put('version', 'v2');
-        context.put('markup', markup);
+        ctx.put('finalPrice', Math.round(finalPrice * 100) / 100);
+        ctx.put('version', 'v2');
+        ctx.put('markup', markup);
         """;
 
     Files.writeString(pricingScriptPath, pricingV2);
@@ -271,7 +271,7 @@ public class DynamicBusinessRulesExample {
     // Create validation script
     String validationScript =
         """
-        var order = context.get('order');
+        var order = ctx.get('order');
         var errors = [];
 
         // Validate required fields
@@ -285,8 +285,8 @@ public class DynamicBusinessRulesExample {
         }
 
         var isValid = errors.length === 0;
-        context.put('validationErrors', errors);
-        context.put('isValid', isValid);
+        ctx.put('validationErrors', errors);
+        ctx.put('isValid', isValid);
 
         if (!isValid) {
             throw new Error('Validation failed: ' + errors.join(', '));
@@ -299,7 +299,7 @@ public class DynamicBusinessRulesExample {
     // Create calculation script
     String calculationScript =
         """
-        var order = context.get('order');
+        var order = ctx.get('order');
 
         // Calculate line totals
         var lineTotal = order.items.reduce((sum, item) =>
@@ -315,10 +315,10 @@ public class DynamicBusinessRulesExample {
         // Calculate final total
         var total = lineTotal + tax + shipping;
 
-        context.put('lineTotal', Math.round(lineTotal * 100) / 100);
-        context.put('tax', Math.round(tax * 100) / 100);
-        context.put('shipping', Math.round(shipping * 100) / 100);
-        context.put('calculatedTotal', Math.round(total * 100) / 100);
+        ctx.put('lineTotal', Math.round(lineTotal * 100) / 100);
+        ctx.put('tax', Math.round(tax * 100) / 100);
+        ctx.put('shipping', Math.round(shipping * 100) / 100);
+        ctx.put('calculatedTotal', Math.round(total * 100) / 100);
         """;
 
     Path calculationScriptPath = scriptsDir.resolve("order_calculation.js");

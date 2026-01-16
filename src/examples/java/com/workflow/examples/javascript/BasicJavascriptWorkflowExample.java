@@ -49,11 +49,11 @@ public class BasicJavascriptWorkflowExample {
     ScriptProvider calculationScript =
         new InlineScriptProvider(
             """
-            var price = context.get('price');
-            var quantity = context.get('quantity');
+            var price = ctx.get('price');
+            var quantity = ctx.get('quantity');
             var total = price * quantity;
-            context.put('total', total);
-            context.put('calculated', true);
+            ctx.put('total', total);
+            ctx.put('calculated', true);
             """);
 
     // Build workflow
@@ -92,8 +92,8 @@ public class BasicJavascriptWorkflowExample {
     ScriptProvider discountScript =
         new InlineScriptProvider(
             """
-            var orderTotal = context.get('orderTotal');
-            var customerTier = context.get('customerTier');
+            var orderTotal = ctx.get('orderTotal');
+            var customerTier = ctx.get('customerTier');
 
             var discountPercent = 0;
             var discountCode = null;
@@ -119,10 +119,10 @@ public class BasicJavascriptWorkflowExample {
             var discountAmount = orderTotal * (discountPercent / 100);
             var finalTotal = orderTotal - discountAmount;
 
-            context.put('discountPercent', discountPercent);
-            context.put('discountCode', discountCode);
-            context.put('discountAmount', discountAmount);
-            context.put('finalTotal', finalTotal);
+            ctx.put('discountPercent', discountPercent);
+            ctx.put('discountCode', discountCode);
+            ctx.put('discountAmount', discountAmount);
+            ctx.put('finalTotal', finalTotal);
             """);
 
     JavascriptWorkflow workflow =
@@ -157,7 +157,7 @@ public class BasicJavascriptWorkflowExample {
     ScriptProvider dataScript =
         new InlineScriptProvider(
             """
-            var numbers = context.get('numbers');
+            var numbers = ctx.get('numbers');
 
             // Calculate statistics
             var sum = numbers.reduce((acc, n) => acc + n, 0);
@@ -169,12 +169,12 @@ public class BasicJavascriptWorkflowExample {
             var evenNumbers = numbers.filter(n => n % 2 === 0);
             var doubled = numbers.map(n => n * 2);
 
-            context.put('sum', sum);
-            context.put('average', avg);
-            context.put('min', min);
-            context.put('max', max);
-            context.put('evenNumbers', evenNumbers);
-            context.put('doubled', doubled);
+            ctx.put('sum', sum);
+            ctx.put('average', avg);
+            ctx.put('min', min);
+            ctx.put('max', max);
+            ctx.put('evenNumbers', evenNumbers);
+            ctx.put('doubled', doubled);
             """);
 
     JavascriptWorkflow workflow =
@@ -205,7 +205,7 @@ public class BasicJavascriptWorkflowExample {
     ScriptProvider jsonScript =
         new InlineScriptProvider(
             """
-            var jsonString = context.get('jsonData');
+            var jsonString = ctx.get('jsonData');
             var data = JSON.parse(jsonString);
 
             // Extract and transform
@@ -221,8 +221,8 @@ public class BasicJavascriptWorkflowExample {
                 emails: userEmails
             };
 
-            context.put('summary', summary);
-            context.put('activeUserNames', activeUsers.map(u => u.name));
+            ctx.put('summary', summary);
+            ctx.put('activeUserNames', activeUsers.map(u => u.name));
             """);
 
     JavascriptWorkflow workflow =
