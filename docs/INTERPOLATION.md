@@ -1,1320 +1,1993 @@
-# String Interpolation
-
-The Workflow Engine provides a powerful and flexible string interpolation system that allows you to dynamically resolve placeholders in strings from various sources such as workflow contexts, custom properties, system properties, and environment variables.
+# Workflow Engine - String Interpolation Guide
 
 ## Table of Contents
-
 - [Overview](#overview)
-- [Quick Start](#quick-start)
+- [Getting Started](#getting-started)
+- [StringInterpolator Interface](#stringinterpolator-interface)
+- [JakartaElStringInterpolator](#jakartaelstringinterpolator)
 - [Placeholder Syntax](#placeholder-syntax)
-- [Property Resolution](#property-resolution)
-- [Using Interpolation](#using-interpolation)
-  - [Static Methods](#static-methods)
-  - [With Workflow Context](#with-workflow-context)
-  - [With Custom Properties](#with-custom-properties)
-  - [Combined Context and Properties](#combined-context-and-properties)
-- [Property Resolvers](#property-resolvers)
-  - [Built-in Resolvers](#built-in-resolvers)
-  - [Custom Resolvers](#custom-resolvers)
-  - [Resolution Order](#resolution-order)
-- [Advanced Features](#advanced-features)
-  - [Strict Mode](#strict-mode)
-  - [Nested Interpolation](#nested-interpolation)
-  - [Escaped Placeholders](#escaped-placeholders)
-  - [Default Values](#default-values)
-  - [Nested Property Access](#nested-property-access)
-- [Customization](#customization)
-  - [Building Custom Interpolators](#building-custom-interpolators)
-  - [Configuring Max Depth](#configuring-max-depth)
-  - [Custom Resolver Priority](#custom-resolver-priority)
-- [Error Handling](#error-handling)
+- [Expression Language Features](#expression-language-features)
+- [Creating Interpolators](#creating-interpolators)
+- [Variable Sources](#variable-sources)
+- [Strict vs Non-Strict Mode](#strict-vs-non-strict-mode)
+- [WorkflowContext Integration](#workflowcontext-integration)
+- [Advanced Examples](#advanced-examples)
 - [Best Practices](#best-practices)
-- [Examples](#examples)
+- [Error Handling](#error-handling)
 - [API Reference](#api-reference)
-
----
 
 ## Overview
 
-String interpolation is a technique for substituting placeholders in strings with actual values at runtime. The Workflow Engine's interpolation system supports:
+The Workflow Engine provides powerful string interpolation capabilities through the **StringInterpolator** interface and its Jakarta Expression Language (EL) implementation. This feature enables dynamic string resolution with support for:
 
-- **Multiple placeholder formats**: Simple (`${key}`) and with defaults (`${key:-default}`)
-- **Nested resolution**: Values can contain placeholders that are recursively resolved
-- **Multiple sources**: Properties from context, maps, system properties, environment variables, and custom sources
-- **Flexible resolution order**: Configurable priority chain for resolver precedence
-- **Type conversion**: Automatic conversion of non-string values to strings
-- **Escape sequences**: Support for literal placeholder syntax
-- **Strict and lenient modes**: Control how unresolved placeholders are handled
+- **Variable substitution**: Replace placeholders with runtime values
+- **Property access**: Navigate nested objects and maps
+- **Arithmetic operations**: Perform calculations within expressions
+- **Conditional logic**: Use ternary operators for dynamic content
+- **Method calls**: Invoke methods on objects
+- **Collection operations**: Access and manipulate lists, arrays, and maps
+- **Logical operations**: Combine conditions with boolean operators
 
----
+String interpolation is particularly useful for:
+- Dynamic configuration values
+- Template-based content generation
+- Conditional message formatting
+- Computed values based on workflow context
+- Dynamic URL and query parameter construction
 
-## Quick Start
+## Getting Started
 
-### Basic Usage
+### Quick Example
 
 ```java
-import com.workflow.interpolation.Interpolation;
+import com.workflow.interpolation.JakartaElStringInterpolator;
+import java.util.Map;
 
-public void example() {
-    // Set a system property
-    System.setProperty("app.name", "MyApplication");
-
-    // Simple interpolation
-    String result = Interpolation.interpolate("Welcome to ${app.name}!");
-    // Result: "Welcome to MyApplication!"
-
-    // With default value
-    String message = Interpolation.interpolate("Status: ${app.status:-running}");
-    // Result: "Status: running" (if app.status is not defined)
+public class QuickStart {
+    static void main(String[] args) {
+        // Create variables
+        Map<String, Object> variables = Map.of(
+            "userName", "Alice",
+            "age", 30,
+            "isAdmin", true
+        );
+        
+        // Create interpolator
+        JakartaElStringInterpolator interpolator = 
+            JakartaElStringInterpolator.forVariables(variables);
+        
+        // Interpolate strings
+        String greeting = interpolator.interpolate("Hello, ${userName}!");
+        // Result: "Hello, Alice!"
+        
+        String status = interpolator.interpolate(
+            "User ${userName} is ${age >= 18 ? 'adult' : 'minor'}"
+        );
+        // Result: "User Alice is adult"
+    }
 }
 ```
 
-### With Workflow Context
+## StringInterpolator Interface
+
+The core interface for string interpolation.
+
+### Interface Methods
 
 ```java
-import com.workflow.context.WorkflowContext;
-import com.workflow.interpolation.Interpolation;
-
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("user", "Alice");
-    context.put("action", "login");
-
-    String log = Interpolation.interpolate(
-            "User ${user} performed ${action}",
-            context
-    );
-    // Result: "User Alice performed login"
+public interface StringInterpolator {
+    /**
+     * Interpolate all placeholders using default mode
+     */
+    String interpolate(String input);
+    
+    /**
+     * Interpolate with explicit strict mode control
+     */
+    String interpolate(String input, boolean strict);
+    
+    /**
+     * Check if string contains placeholders
+     */
+    boolean containsPlaceholders(String input);
 }
 ```
 
----
+### Method Behavior
+
+| Method                         | Description                                        | Returns                      |
+|--------------------------------|----------------------------------------------------|------------------------------|
+| `interpolate(String)`          | Resolves all placeholders using default strictness | Interpolated string          |
+| `interpolate(String, boolean)` | Resolves with explicit strict mode                 | Interpolated string          |
+| `containsPlaceholders(String)` | Checks for placeholder presence                    | `true` if placeholders exist |
+
+## JakartaElStringInterpolator
+
+The Jakarta Expression Language implementation of `StringInterpolator` provides full EL 3.0+ support.
+
+### Key Features
+
+- **Full EL Syntax**: Supports complete Jakarta EL specification
+- **High Performance**: Compiled expressions for efficiency
+- **Type Safety**: Proper type coercion and handling
+- **Extensible**: Custom variable sources via WorkflowContext
+- **Secure**: Safe evaluation without code execution risks
+
+### Import Statement
+
+```java
+import com.workflow.interpolation.JakartaElStringInterpolator;
+import com.workflow.interpolation.StringInterpolator;
+import com.workflow.interpolation.exception.InterpolationException;
+```
 
 ## Placeholder Syntax
 
-The interpolation system supports several placeholder formats:
-
-### Simple Placeholder
+### Basic Placeholder Format
 
 ```
-${key}
+${expression}
 ```
 
-Resolves the value associated with `key`. If the key is not found and strict mode is disabled, the placeholder is left as-is.
-
-**Example:**
-```java
-public void example() {
-    System.setProperty("version", "2.0.0");
-    String result = Interpolation.interpolate("Version: ${version}");
-    // Result: "Version: 2.0.0"
-}
-```
-
-### Placeholder with Default Value
-
-```
-${key:-defaultValue}
-```
-
-Resolves the value associated with `key`, or uses `defaultValue` if the key is not found.
-
-**Example:**
-```java
-String result = Interpolation.interpolate("Environment: ${env:-development}");
-// Result: "Environment: development" (if env is not defined)
-```
-
-### Escaped Placeholder
-
-```
-\${literal}
-```
-
-Prevents interpolation and produces a literal placeholder in the output.
-
-**Example:**
-```java
-String result = Interpolation.interpolate("Use \\${syntax} for placeholders");
-// Result: "Use ${syntax} for placeholders"
-```
-
----
-
-## Property Resolution
-
-The interpolation system uses a chain of **PropertyResolvers** to resolve placeholder values. Each resolver attempts to find the requested key from its source. If not found, the next resolver in the chain is tried.
-
-### Resolution Flow
-
-1. **Check if placeholder exists** in the input string
-2. **Extract the key** from the placeholder syntax
-3. **Iterate through resolvers** in priority order (lowest order value first)
-4. **First non-empty result wins** - return the value
-5. **If no resolver returns a value**:
-   - Use the default value if specified in the placeholder
-   - In strict mode: throw `InterpolationException`
-   - In lenient mode: leave the placeholder as-is
-
----
-
-## Using Interpolation
-
-### Static Methods
-
-The `Interpolation` utility class provides convenient static methods for common scenarios:
-
-#### Basic Interpolation
-
-```java
-// Interpolate using system properties and environment variables
-String result = Interpolation.interpolate("${user.home}");
-```
-
-#### With Strict Mode
-
-```java
-public void example() {
-    // Throw exception if placeholder cannot be resolved
-    try {
-        String result = Interpolation.interpolate("${missing.key}", true);
-    } catch (InterpolationException e) {
-        // Handle unresolved placeholder
-        System.err.println("Missing key: " + e.getPlaceholder());
-    }
-}
-```
-
-#### Check for Placeholders
-
-```java
-boolean hasPlaceholders = Interpolation.containsPlaceholders("Hello ${name}");
-// Result: true
-
-boolean noPlaceholders = Interpolation.containsPlaceholders("Hello World");
-// Result: false
-```
-
-### With Workflow Context
-
-Use workflow context values for interpolation:
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("orderId", "ORD-12345");
-    context.put("customerId", "CUST-789");
-
-    String message = Interpolation.interpolate(
-            "Processing order ${orderId} for customer ${customerId}",
-            context
-    );
-    // Result: "Processing order ORD-12345 for customer CUST-789"
-}
-```
-
-**Type Conversion:**
-The context can store values of any type, which are automatically converted to strings:
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("itemCount", 42);
-    context.put("price", 19.99);
-    context.put("isActive", true);
-
-    String details = Interpolation.interpolate(
-            "Items: ${itemCount}, Price: ${price}, Active: ${isActive}",
-            context
-    );
-// Result: "Items: 42, Price: 19.99, Active: true"
-}
-```
-
-### With Custom Properties
-
-Use a custom map of properties:
-
-```java
-Map<String, String> config = Map.of(
-    "app.name", "MyApp",
-    "app.version", "1.0.0",
-    "app.environment", "production"
-);
-
-String info = Interpolation.interpolate(
-    "${app.name} v${app.version} (${app.environment})",
-    config
-);
-// Result: "MyApp v1.0.0 (production)"
-```
-
-**Mutable Maps:**
-```java
-public void example() {
-    Map<String, String> config = new HashMap<>();
-    config.put("mode", "debug");
-
-    String msg1 = Interpolation.interpolate("Mode: ${mode}", config);
-    // Result: "Mode: debug"
-
-    config.put("mode", "release");
-    String msg2 = Interpolation.interpolate("Mode: ${mode}", config);
-    // Result: "Mode: release"
-}
-```
-
-### Combined Context and Properties
-
-Use both workflow context and custom properties, with properties taking precedence:
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("source", "context");
-    context.put("contextOnly", "from-context");
-
-    Map<String, String> properties = Map.of(
-            "source", "properties",
-            "propsOnly", "from-props"
-    );
-
-    StringInterpolator interpolator =
-            Interpolation.forContextAndProperties(context, properties);
-
-    // Properties have higher priority (order 50 vs 100)
-    interpolator.interpolate("${source}");
-    // Result: "properties"
-
-    interpolator.interpolate("${contextOnly}");
-    // Result: "from-context"
-
-    interpolator.interpolate("${propsOnly}");
-    // Result: "from-props"
-}
-```
-
----
-
-## Property Resolvers
-
-Property resolvers are strategies for looking up values by key. The interpolation system includes several built-in resolvers and supports custom implementations.
-
-### Built-in Resolvers
-
-#### 1. MapPropertyResolver
-
-Resolves values from a custom `Map<String, ?>`.
-
-**Default Order:** 50
-
-```java
-Map<String, Object> props = Map.of(
-    "database.url", "jdbc:postgresql://localhost/mydb",
-    "database.username", "admin"
-);
-
-MapPropertyResolver resolver = new MapPropertyResolver(props);
-```
-
-**Features:**
-- Supports nested property access with dot notation (in non-strict mode)
-- Can resolve exact key matches
-- Configurable strict mode
-
-**Example with Nested Maps:**
-```java
-public void example() {
-    Map<String, Object> config = Map.of(
-            "database", Map.of(
-                    "host", "localhost",
-                    "port", 5432
-            )
-    );
-
-    // Non-strict mode allows nested access
-    MapPropertyResolver resolver = new MapPropertyResolver(config, 50, false);
-    resolver.resolve("database.host"); // Returns "localhost"
-}
-```
-
-#### 2. WorkflowContextPropertyResolver
-
-Resolves values from a `WorkflowContext`.
-
-**Default Order:** 100
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("userId", "USER-123");
-
-    WorkflowContextPropertyResolver resolver =
-            new WorkflowContextPropertyResolver(context);
-}
-```
-
-**Features:**
-- Automatically converts all types to strings
-- Supports nested property access (in non-strict mode)
-- Integrates seamlessly with workflow execution
-
-#### 3. SystemPropertiesResolver
-
-Resolves values from Java system properties (e.g., those set with `-D` flags or `System.setProperty()`).
-
-**Default Order:** 200
-
-```java
-public void example() {
-    System.setProperty("app.mode", "production");
-
-    SystemPropertiesResolver resolver = new SystemPropertiesResolver();
-    resolver.resolve("app.mode"); // Returns "production"
-}
-```
-
-**Common System Properties:**
-- `java.version` - Java runtime version
-- `java.home` - Java installation directory
-- `user.home` - User's home directory
-- `user.name` - User account name
-- `os.name` - Operating system name
-
-#### 4. EnvironmentPropertyResolver
-
-Resolves values from environment variables.
-
-**Default Order:** 300
-
-```java
-public void example() {
-    EnvironmentPropertyResolver resolver = new EnvironmentPropertyResolver();
-    resolver.resolve("HOME"); // Returns the HOME environment variable
-}
-```
-
-**Features:**
-- Key normalization: tries multiple variants
-  - Original key: `database.url`
-  - With underscores: `database_url`
-  - Uppercase: `DATABASE_URL`
-- Configurable normalization behavior
-
-**Example:**
-```java
-// All of these can resolve the same environment variable
-String value1 = resolver.resolve("PATH");
-String value2 = resolver.resolve("path");
-String value3 = resolver.resolve("PATH");
-```
-
-#### 5. CompositePropertyResolver
-
-Combines multiple resolvers into a chain, trying each in order until one returns a value.
-
-```java
-PropertyResolver composite = CompositePropertyResolver.builder()
-    .add(new MapPropertyResolver(customProps))
-    .add(new SystemPropertiesResolver())
-    .add(new EnvironmentPropertyResolver())
-    .build();
-```
-
-**Features:**
-- Automatically sorts resolvers by priority order
-- Stops at the first resolver that returns a non-empty result
-- Efficient chaining with short-circuit evaluation
-
-### Custom Resolvers
-
-Implement the `PropertyResolver` interface to create custom resolution strategies:
-
-```java
-public class DatabasePropertyResolver implements PropertyResolver {
-    
-    private final DataSource dataSource;
-    
-    public DatabasePropertyResolver(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
-    
-    @Override
-    public Optional<String> resolve(String key) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                 "SELECT value FROM config WHERE key = ?")) {
-            stmt.setString(1, key);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(rs.getString("value"));
-                }
-            }
-        } catch (SQLException e) {
-            // Log error
-        }
-        return Optional.empty();
-    }
-    
-    @Override
-    public int order() {
-        return 75; // Between MapPropertyResolver (50) and WorkflowContext (100)
-    }
-}
-```
-
-**Use the Custom Resolver:**
-```java
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new DatabasePropertyResolver(dataSource))
-    .addResolver(new SystemPropertiesResolver())
-    .addResolver(new EnvironmentPropertyResolver())
-    .build();
-
-String value = interpolator.interpolate("${db.config.timeout}");
-```
-
-### Resolution Order
-
-Resolvers are executed in ascending order of their `order()` value. **Lower values = higher priority.**
-
-**Default Order:**
-1. **Custom Map** (order 50) - `MapPropertyResolver`
-2. **Workflow Context** (order 100) - `WorkflowContextPropertyResolver`
-3. **System Properties** (order 200) - `SystemPropertiesResolver`
-4. **Environment Variables** (order 300) - `EnvironmentPropertyResolver`
-
-This means a key in a custom map will override the same key in the workflow context or system properties.
-
-**Example:**
-```java
-public void example() {
-    System.setProperty("env", "system-prop");
-    System.setenv().put("ENV", "env-var"); // Conceptual - env vars are read-only
-
-    Map<String, String> props = Map.of("env", "custom-map");
-
-    String result = Interpolation.interpolate("${env}", props);
-    // Result: "custom-map" (highest priority)
-}
-```
-
----
-
-## Advanced Features
-
-### Strict Mode
-
-Strict mode controls how the interpolator handles unresolved placeholders.
-
-#### Lenient Mode (Default)
-
-Unresolved placeholders without defaults are left as-is:
-
-```java
-String result = Interpolation.interpolate("${unknown.key}", false);
-// Result: "${unknown.key}"
-```
-
-#### Strict Mode
-
-Unresolved placeholders without defaults throw an exception:
-
-```java
-public void example() {
-    try {
-        String result = Interpolation.interpolate("${unknown.key}", true);
-    } catch (InterpolationException e) {
-        System.err.println("Failed to resolve: " + e.getPlaceholder());
-        // Output: "Failed to resolve: unknown.key"
-    }
-}
-```
-
-#### Defaults Override Strict Mode
-
-Even in strict mode, placeholders with defaults won't throw an exception:
-
-```java
-String result = Interpolation.interpolate("${unknown.key:-default}", true);
-// Result: "default" (no exception thrown)
-```
-
-### Nested Interpolation
-
-Resolved values can themselves contain placeholders, which are recursively resolved:
-
-```java
-public void example() {
-    System.setProperty("base.path", "/usr/local");
-    System.setProperty("app.home", "${base.path}/myapp");
-    System.setProperty("config.file", "${app.home}/config.yml");
-
-    String result = Interpolation.interpolate("Config: ${config.file}");
-    // Result: "Config: /usr/local/myapp/config.yml"
-}
-```
-
-**Circular Reference Detection:**
-```java
-public void example() {
-    System.setProperty("a", "${b}");
-    System.setProperty("b", "${a}");
-
-    try {
-        String result = Interpolation.interpolate("${a}");
-    } catch (InterpolationException e) {
-        System.err.println(e.getMessage());
-        // Output: "Circular reference detected for key: a"
-    }
-}
-```
-
-**Max Depth Protection:**
-The interpolator has a configurable maximum recursion depth (default: 10) to prevent infinite loops:
-
-```java
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new SystemPropertiesResolver())
-    .maxDepth(5)
-    .build();
-```
+Where `expression` can be:
+- Variable name: `${userName}`
+- Property path: `${user.name}`
+- Array/list access: `${items[0]}`
+- Method call: `${text.toUpperCase()}`
+- Arithmetic: `${price * quantity}`
+- Comparison: `${age >= 18}`
+- Ternary: `${condition ? trueValue : falseValue}`
 
 ### Escaped Placeholders
 
-Use backslash to escape placeholders and prevent interpolation:
+To include literal `${...}` text without interpolation:
 
 ```java
-String template = Interpolation.interpolate(
-    "To use variables, write \\${variableName}"
-);
-// Result: "To use variables, write ${variableName}"
+String template = "Use \\${expression} syntax for placeholders";
+String result = interpolator.interpolate(template);
+// Result: "Use ${expression} syntax for placeholders"
 ```
 
-**Mixed Escaped and Real:**
+### Examples
+
+```
+// Simple variable
+"Hello, ${name}!"                    // "Hello, Alice!"
+
+// Nested property
+"Email: ${user.email}"               // "Email: alice@example.com"
+
+// Array access
+"First item: ${items[0]}"            // "First item: apple"
+
+// Arithmetic
+"Total: ${price * quantity}"         // "Total: 59.97"
+
+// Conditional
+"Status: ${age >= 18 ? 'adult' : 'minor'}"  // "Status: adult"
+
+// Escaped
+"Use \\${variable} syntax"           // "Use ${variable} syntax"
+```
+
+## Expression Language Features
+
+### 1. Property Access
+
+Access object properties and nested values:
+
+```java
+Map<String, Object> variables = Map.of(
+    "user", Map.of(
+        "name", "Bob",
+        "address", Map.of(
+            "city", "Seattle",
+            "zip", "98101"
+        )
+    )
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// Direct property
+String name = interpolator.interpolate("${user.name}");
+// Result: "Bob"
+
+// Nested property
+String city = interpolator.interpolate("${user.address.city}");
+// Result: "Seattle"
+```
+
+### 2. Collection Access
+
+Work with lists, arrays, and maps:
+
+```java
+Map<String, Object> variables = Map.of(
+    "items", List.of("apple", "banana", "cherry"),
+    "numbers", List.of(1, 2, 3, 4, 5)
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// List index access
+String first = interpolator.interpolate("${items[0]}");
+// Result: "apple"
+
+// List size
+String count = interpolator.interpolate("${items.size()}");
+// Result: "3"
+
+// Multiple elements
+String display = interpolator.interpolate("${items[0]}, ${items[1]}, ${items[2]}");
+// Result: "apple, banana, cherry"
+```
+
+### 3. Arithmetic Operations
+
+Perform mathematical calculations:
+
+```java
+Map<String, Object> variables = Map.of(
+    "price", 19.99,
+    "quantity", 3,
+    "discount", 0.10
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// Addition
+String result = interpolator.interpolate("Total: ${price + 10}");
+// Result: "Total: 29.99"
+
+// Multiplication
+String subtotal = interpolator.interpolate("${price * quantity}");
+// Result: "59.97"
+
+// Complex calculation
+String finalPrice = interpolator.interpolate(
+    "Final: ${(price * quantity) * (1 - discount)}"
+);
+// Result: "Final: 53.973"
+```
+
+**Supported Operators:**
+- Addition: `+`
+- Subtraction: `-`
+- Multiplication: `*`
+- Division: `/`
+- Modulo: `%`
+
+### 4. Comparison Operations
+
+Compare values using relational operators:
+
+```java
+Map<String, Object> variables = Map.of(
+    "age", 30,
+    "score", 85,
+    "status", "active"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// Greater than or equal
+String isAdult = interpolator.interpolate("${age >= 18}");
+// Result: "true"
+
+// Equality
+String isActive = interpolator.interpolate("${status == 'active'}");
+// Result: "true"
+
+// Less than
+String needsImprovement = interpolator.interpolate("${score < 90}");
+// Result: "true"
+```
+
+**Supported Operators:**
+- Equal: `==`
+- Not equal: `!=`
+- Greater than: `>`
+- Greater than or equal: `>=`
+- Less than: `<`
+- Less than or equal: `<=`
+
+### 5. Conditional Expressions
+
+Use ternary operators for conditional logic:
+
+```java
+Map<String, Object> variables = Map.of(
+    "age", 30,
+    "score", 85,
+    "membership", "premium"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// Simple ternary
+String ageCategory = interpolator.interpolate(
+    "${age >= 18 ? 'adult' : 'minor'}"
+);
+// Result: "adult"
+
+// Nested ternary
+String category = interpolator.interpolate(
+    "${age < 13 ? 'child' : (age < 20 ? 'teen' : 'adult')}"
+);
+// Result: "adult"
+
+// With string concatenation
+String message = interpolator.interpolate(
+    "Grade: ${score >= 90 ? 'A' : (score >= 80 ? 'B' : 'C')}"
+);
+// Result: "Grade: B"
+```
+
+### 6. Logical Operations
+
+Combine conditions with boolean operators:
+
+```java
+Map<String, Object> variables = Map.of(
+    "isActive", true,
+    "age", 30,
+    "hasPermission", true,
+    "items", List.of("a", "b", "c")
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// AND operation
+String canProceed = interpolator.interpolate(
+    "${isActive && age > 18}"
+);
+// Result: "true"
+
+// OR operation
+String hasAccess = interpolator.interpolate(
+    "${isActive || hasPermission}"
+);
+// Result: "true"
+
+// NOT operation
+String isInactive = interpolator.interpolate("${!isActive}");
+// Result: "false"
+
+// Empty check
+String hasItems = interpolator.interpolate("${!empty items}");
+// Result: "true"
+```
+
+**Supported Operators:**
+- AND: `&&`
+- OR: `||`
+- NOT: `!`
+- Empty check: `empty`
+
+### 7. String Operations
+
+Manipulate strings within expressions:
+
+```java
+Map<String, Object> variables = Map.of(
+    "firstName", "John",
+    "lastName", "Doe",
+    "email", "john.doe@example.com"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// String concatenation with +=
+String fullName = interpolator.interpolate(
+    "${firstName += ' ' += lastName}"
+);
+// Result: "John Doe"
+
+// Multiple concatenations
+String formatted = interpolator.interpolate(
+    "Name: ${firstName += ' ' += lastName}, Email: ${email}"
+);
+// Result: "Name: John Doe, Email: john.doe@example.com"
+```
+
+### 8. Method Calls
+
+Invoke methods on objects:
+
+```java
+Map<String, Object> variables = Map.of(
+    "text", "hello world",
+    "items", List.of("apple", "banana", "cherry")
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// String methods
+String upper = interpolator.interpolate("${text.toUpperCase()}");
+// Result: "HELLO WORLD"
+
+// Collection methods
+String size = interpolator.interpolate("Count: ${items.size()}");
+// Result: "Count: 3"
+```
+
+### 9. Lambda Expressions (EL 3.0+)
+
+Use lambda expressions for filtering and transforming collections:
+
 ```java
 public void example() {
-    System.setProperty("actual", "ACTUAL_VALUE");
+    List<Integer> numbers = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.builder()
+                    .variable("numbers", numbers)
+                    .build();
 
-    String result = Interpolation.interpolate(
-            "Real: ${actual}, Escaped: \\${example}"
+    // Check if any number matches condition
+    String hasEven = interpolator.interpolate(
+            "${numbers.stream().anyMatch(x -> x % 2 == 0)}"
     );
-    // Result: "Real: ACTUAL_VALUE, Escaped: ${example}"
-}
-```
+    // Result: "true"
 
-### Default Values
-
-Provide fallback values for missing placeholders:
-
-```java
-String message = Interpolation.interpolate(
-    "Hello ${user.name:-Guest}!"
-);
-// Result: "Hello Guest!" (if user.name is not defined)
-```
-
-**Default with Spaces:**
-```java
-String result = Interpolation.interpolate(
-    "${greeting:-Welcome to our application}"
-);
-// Result: "Welcome to our application"
-```
-
-**Defaults Can Be Empty:**
-```java
-String result = Interpolation.interpolate("${optional:-}");
-// Result: "" (empty string)
-```
-
-**Defaults Can Contain Placeholders:**
-```java
-public void example() {
-    System.setProperty("fallback.name", "DefaultApp");
-
-    String result = Interpolation.interpolate(
-            "${app.name:-${fallback.name}}"
-    );
-    // Result: "DefaultApp" (if app.name is not defined)
-}
-```
-
-### Nested Property Access
-
-When strict mode is disabled, both `MapPropertyResolver` and `WorkflowContextPropertyResolver` support dot notation for nested property access:
-
-```java
-public void example() {
-    Map<String, Object> config = new HashMap<>();
-    config.put("server", Map.of(
-            "host", "localhost",
-            "port", 8080,
-            "ssl", Map.of(
-                    "enabled", true,
-                    "keystore", "/path/to/keystore"
-            )
-    ));
-
-    MapPropertyResolver resolver = new MapPropertyResolver(config, 50, false);
-
-    StringInterpolator interpolator = DefaultStringInterpolator.builder()
-            .addResolver(resolver)
+    // Count filtered elements
+    List<String> names = List.of("Alice", "Bob", "Charlie", "David");
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("names", names)
             .build();
 
-    interpolator.interpolate("${server.host}");
-    // Result: "localhost"
-
-    interpolator.interpolate("${server.ssl.enabled}");
-    // Result: "true"
+    String longNames = interpolator.interpolate(
+            "${names.stream().filter(n -> n.length() > 3).count()}"
+    );
+    // Result: "3"
 }
 ```
 
----
+### 10. Optional Handling
 
-## Customization
-
-### Building Custom Interpolators
-
-Use the builder pattern to create highly customized interpolators:
+Work with Optional values safely:
 
 ```java
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new MapPropertyResolver(customConfig))
-    .addResolver(new WorkflowContextPropertyResolver(context))
-    .addResolver(new SystemPropertiesResolver())
-    .addResolver(new EnvironmentPropertyResolver())
-    .maxDepth(15)
-    .strict(true)
-    .build();
+import java.util.Optional;
 
-String result = interpolator.interpolate("${my.property}");
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("emptyOpt", Optional.empty())
+        .variable("presentOpt", Optional.of("found"))
+        .build();
+
+// Check if present
+String isEmpty = interpolator.interpolate("${emptyOpt.isEmpty()}");
+// Result: "true"
+
+// Use with ternary operator for fallback
+String value = interpolator.interpolate(
+    "${presentOpt.isPresent() ? presentOpt.get() : 'default'}"
+);
+// Result: "found"
 ```
 
-### Configuring Max Depth
+### 11. Array Operations
 
-Control the maximum nesting level for recursive placeholder resolution:
+Access and manipulate arrays:
 
 ```java
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new SystemPropertiesResolver())
-    .maxDepth(5) // Maximum 5 levels of nested placeholders
-    .build();
+public void example() {
+    // Primitive arrays
+    int[] numbers = {10, 20, 30, 40, 50};
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.builder()
+                    .variable("nums", numbers)
+                    .build();
+
+    String first = interpolator.interpolate("${nums[0]}");
+    // Result: "10"
+
+    String length = interpolator.interpolate("${nums.length}");
+    // Result: "5"
+
+    // Multi-dimensional arrays
+    int[][] matrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("matrix", matrix)
+            .build();
+
+    String element = interpolator.interpolate("${matrix[1][1]}");
+    // Result: "5"
+}
 ```
 
-**Why Max Depth?**
-- Prevents infinite loops from circular references
-- Protects against deeply nested configurations
-- Default value (10) is suitable for most use cases
+### 12. Set Operations
 
-### Custom Resolver Priority
-
-Change the default priority order by specifying custom order values:
+Work with Set collections:
 
 ```java
-// Custom resolver with high priority (lower order value)
-PropertyResolver highPriorityResolver = new PropertyResolver() {
-    @Override
-    public Optional<String> resolve(String key) {
-        // Custom logic
-        return Optional.empty();
+import java.util.Set;
+import java.util.LinkedHashSet;
+
+public void example() {
+    Set<String> tags = new LinkedHashSet<>(List.of("java", "spring", "docker"));
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.builder()
+                    .variable("tags", tags)
+                    .build();
+
+    // Check size
+    String count = interpolator.interpolate("${tags.size()}");
+    // Result: "3"
+
+    // Check contains
+    String hasJava = interpolator.interpolate("${tags.contains('java')}");
+    // Result: "true"
+
+    // Check empty
+    Set<String> emptySet = new HashSet<>();
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("emptySet", emptySet)
+            .build();
+
+    String isEmpty = interpolator.interpolate("${empty emptySet}");
+   // Result: "true"
+}
+```
+
+### 13. Advanced Stream Operations
+
+Leverage Java Stream API in expressions:
+
+```java
+public void example() {
+    List<String> words = List.of("cat", "dog", "elephant", "ant");
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.builder()
+                    .variable("words", words)
+                    .build();
+
+    // Filter and count
+    String shortWords = interpolator.interpolate(
+            "${words.stream().filter(w -> w.length() <= 3).count()}"
+    );
+    // Result: "3"
+
+    // All match
+    List<Integer> evenNumbers = List.of(2, 4, 6, 8);
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("nums", evenNumbers)
+            .build();
+
+    String allEven = interpolator.interpolate(
+            "${nums.stream().allMatch(n -> n % 2 == 0)}"
+    );
+    // Result: "true"
+
+    // Find first
+    List<String> names = List.of("Alice", "Bob", "Charlie");
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("names", names)
+            .build();
+
+    String firstB = interpolator.interpolate(
+            "${names.stream().filter(n -> n.startsWith('B')).findFirst().isPresent() ? " +
+                    "names.stream().filter(n -> n.startsWith('B')).findFirst().get() : 'Not found'}"
+    );
+    // Result: "Bob"
+}
+```
+
+### 14. Null-Safe Navigation
+
+Handle null values safely without exceptions:
+
+```java
+public void example() {
+    Map<String, Object> data = new HashMap<>();
+    data.put("value", null);
+
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.builder()
+                    .variable("data", data)
+                    .build();
+
+    // Check null before accessing
+    String result = interpolator.interpolate(
+            "${data.value != null ? data.value : 'N/A'}"
+    );
+    // Result: "N/A"
+
+    // Chained null checks
+    Map<String, Object> outer = new HashMap<>();
+    outer.put("inner", null);
+
+    interpolator = JakartaElStringInterpolator.builder()
+            .variable("obj", outer)
+            .build();
+
+    String safe = interpolator.interpolate(
+            "${obj.inner != null ? obj.inner.value : 'default'}"
+    );
+    // Result: "default"
+}
+```
+
+### 15. Special Character Handling
+
+Work with special characters and escape sequences:
+
+```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("path", "C:\\Users\\Documents")
+        .variable("quote", "He said \"Hello\"")
+        .variable("multiline", "Line1\nLine2\tTabbed")
+        .build();
+
+// Backslashes are preserved
+String path = interpolator.interpolate("Path: ${path}");
+// Result: "Path: C:\Users\Documents"
+
+// Quotes are handled
+String quoted = interpolator.interpolate("${quote}");
+// Result: "He said "Hello""
+
+// Newlines and tabs work
+String multi = interpolator.interpolate("${multiline}");
+// Result: "Line1
+//         Line2    Tabbed"
+```
+
+## Creating Interpolators
+
+### Factory Methods
+
+```java
+public void example() {
+    // 1. From variables map
+    Map<String, Object> vars = Map.of("key", "value");
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.forVariables(vars);
+
+    // 2. From WorkflowContext
+    WorkflowContext context = new WorkflowContext();
+    context.put("key", "value");
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.forContext(context);
+
+    // 3. From both context and variables
+    JakartaElStringInterpolator interpolator =
+            JakartaElStringInterpolator.forContextAndVariables(context, vars);
+}
+```
+
+### Builder Pattern
+
+For more control, use the builder:
+
+```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("name", "Alice")
+        .variable("age", 30)
+        .strict(true)
+        .build();
+```
+
+### Builder Methods
+
+| Method                             | Description                           | Example                 |
+|------------------------------------|---------------------------------------|-------------------------|
+| `variable(String, Object)`         | Add single variable                   | `.variable("x", 10)`    |
+| `variables(Map)`                   | Set all variables (replaces existing) | `.variables(map)`       |
+| `addVariables(Map)`                | Add multiple variables (merges)       | `.addVariables(map)`    |
+| `workflowContext(WorkflowContext)` | Set workflow context                  | `.workflowContext(ctx)` |
+| `context(WorkflowContext)`         | Alias for workflowContext             | `.context(ctx)`         |
+| `strict(boolean)`                  | Set default strict mode               | `.strict(true)`         |
+| `build()`                          | Create the interpolator               | `.build()`              |
+
+## Variable Sources
+
+### 1. Simple Variables Map
+
+Direct key-value pairs:
+
+```
+Map<String, Object> variables = new HashMap<>();
+variables.put("userName", "Alice");
+variables.put("age", 30);
+variables.put("isActive", true);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+```
+
+### 2. Nested Objects
+
+Complex object structures:
+
+```java
+Map<String, Object> address = Map.of("city", "Seattle", "zip", "98101");
+Map<String, Object> user = Map.of("name", "Bob", "address", address);
+Map<String, Object> variables = Map.of("user", user);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String result = interpolator.interpolate("${user.address.city}");
+// Result: "Seattle"
+```
+
+### 3. Collections
+
+Lists and arrays:
+
+```java
+Map<String, Object> variables = Map.of(
+    "items", List.of("apple", "banana", "cherry"),
+    "scores", new int[]{85, 90, 95}
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+```
+
+#### Advanced List Operations
+
+```java
+List<Integer> numbers = List.of(1, 2, 3, 4, 5);
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("nums", numbers)
+        .build();
+
+// Get sublist
+String sublistSize = interpolator.interpolate("${nums.subList(1, 4).size()}");
+// Result: "3"
+
+// Check if contains
+String hasThree = interpolator.interpolate("${nums.contains(3)}");
+// Result: "true"
+
+// Get index of element
+String index = interpolator.interpolate("${nums.indexOf(3)}");
+// Result: "2"
+
+// Access last element
+String last = interpolator.interpolate("${nums.get(nums.size() - 1)}");
+// Result: "5"
+```
+
+#### Advanced Map Operations
+
+```java
+Map<String, Integer> scores = Map.of("alice", 95, "bob", 88, "charlie", 92);
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("scores", scores)
+        .build();
+
+// Check if key exists
+String hasAlice = interpolator.interpolate("${scores.containsKey('alice')}");
+// Result: "true"
+
+// Get keySet size
+String keyCount = interpolator.interpolate("${scores.keySet().size()}");
+// Result: "3"
+
+// Check specific keys
+String aliceScore = interpolator.interpolate(
+    "${scores.containsKey('alice') ? scores.alice : 0}"
+);
+// Result: "95"
+```
+
+### 4. POJOs
+
+Plain Java objects:
+
+```java
+public class User {
+    private String name;
+    private int age;
+    // getters and setters
+}
+
+User user = new User("Alice", 30);
+Map<String, Object> variables = Map.of("user", user);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String result = interpolator.interpolate("${user.name} is ${user.age}");
+// Result: "Alice is 30"
+```
+
+#### POJOs with Collections
+
+```java
+public class Team {
+    private String name;
+    private List<Person> members;
+    // getters and setters
+}
+
+List<Person> members = List.of(
+    new Person("Alice", 30),
+    new Person("Bob", 25)
+);
+Team team = new Team("Alpha Team", members);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("team", team)
+        .build();
+
+String firstMember = interpolator.interpolate("${team.members[0].name}");
+// Result: "Alice"
+
+String teamSize = interpolator.interpolate("${team.members.size()}");
+// Result: "2"
+```
+
+#### Java Records Support
+
+```java
+public record Product(String name, double price, int quantity) {}
+
+Product product = new Product("Widget", 29.99, 5);
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("product", product)
+        .build();
+
+String total = interpolator.interpolate(
+    "Total: $${product.price() * product.quantity()}"
+);
+// Result: "Total: $149.95"
+```
+
+## Strict vs Non-Strict Mode
+
+### Non-Strict Mode (Default)
+
+Unresolved placeholders are left as-is:
+
+```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("x", 1)
+        .strict(false)  // default
+        .build();
+
+String result = interpolator.interpolate("Value: ${unknown}");
+// Result: "Value: ${unknown}"
+// No exception thrown
+```
+
+### Strict Mode
+
+Unresolved placeholders throw exceptions:
+
+```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("x", 1)
+        .strict(true)
+        .build();
+
+public void example() {
+    try {
+        String result = interpolator.interpolate("Value: ${unknown}");
+    } catch (InterpolationException e) {
+        // Exception thrown for unresolved placeholder
+        System.err.println("Failed to resolve: " + e.getMessage());
+    }
+}
+```
+
+### Per-Call Strict Override
+
+Override default behavior per call:
+
+```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("x", 1)
+        .strict(false)  // default is non-strict
+        .build();
+
+public void example() {
+    // Use strict mode for this call only
+    try {
+        String result = interpolator.interpolate("${unknown}", true);
+    } catch (InterpolationException e) {
+        // Exception thrown
+    }
+
+    // Use non-strict mode for this call
+    String result2 = interpolator.interpolate("${unknown}", false);
+    // Returns: "${unknown}"
+}
+```
+
+### When to Use Strict Mode
+
+**Use Strict Mode When:**
+- All variables must be present (fail-fast validation)
+- Missing variables indicate configuration errors
+- You want to catch typos in placeholder names
+- Production systems requiring complete data
+
+**Use Non-Strict Mode When:**
+- Optional variables are acceptable
+- Templates may have partial data
+- Graceful degradation is preferred
+- Development/testing environments
+
+## WorkflowContext Integration
+
+The interpolator integrates seamlessly with `WorkflowContext`:
+
+### Basic Context Usage
+
+```
+import com.workflow.context.WorkflowContext;
+
+WorkflowContext context = new WorkflowContext();
+context.put("userId", 12345);
+context.put("userName", "Charlie");
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forContext(context);
+
+String result = interpolator.interpolate("User ${userId}: ${userName}");
+// Result: "User 12345: Charlie"
+```
+
+### Context with Additional Variables
+
+Combine context data with extra variables:
+
+```
+WorkflowContext context = new WorkflowContext();
+context.put("userId", 12345);
+
+Map<String, Object> additionalVars = Map.of(
+    "prefix", "USER",
+    "suffix", "ACTIVE"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forContextAndVariables(
+        context, 
+        additionalVars
+    );
+
+String result = interpolator.interpolate(
+    "${prefix}-${userId}-${suffix}"
+);
+// Result: "USER-12345-ACTIVE"
+```
+
+### Nested Objects in Context
+
+```
+WorkflowContext context = new WorkflowContext();
+context.put("order", Map.of(
+    "id", "ORD-001",
+    "total", 99.99,
+    "items", List.of("Item A", "Item B")
+));
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forContext(context);
+
+String result = interpolator.interpolate(
+    "Order ${order.id}: $${order.total} (${order.items.size()} items)"
+);
+// Result: "Order ORD-001: $99.99 (2 items)"
+```
+
+### Workflow Integration Example
+
+```java
+public class InterpolatingWorkflow implements Workflow {
+    private final String messageTemplate;
+    
+    public InterpolatingWorkflow(String template) {
+        this.messageTemplate = template;
     }
     
     @Override
-    public int order() {
-        return 25; // Higher priority than MapPropertyResolver (50)
+    public WorkflowResult execute(WorkflowContext context) {
+        // Create interpolator from context
+        JakartaElStringInterpolator interpolator = 
+            JakartaElStringInterpolator.forContext(context);
+        
+        // Interpolate template with context data
+        String message = interpolator.interpolate(messageTemplate);
+        
+        // Store result back in context
+        context.put("generatedMessage", message);
+        
+        return WorkflowResult.success();
     }
-};
+    
+    @Override
+    public String getName() {
+        return "InterpolatingWorkflow";
+    }
+}
 
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(highPriorityResolver)
-    .addResolver(new MapPropertyResolver(props)) // order 50
-    .addResolver(new SystemPropertiesResolver()) // order 200
-    .build();
+// Usage
+public void example() {
+    WorkflowContext context = new WorkflowContext();
+    context.put("userName", "Alice");
+    context.put("action", "login");
+
+    Workflow workflow = new InterpolatingWorkflow(
+            "User ${userName} performed action: ${action}"
+    );
+
+    workflow.execute(context);
+    String message = context.get("generatedMessage");
+    // Result: "User Alice performed action: login"
+}
 ```
 
----
+## Advanced Examples
+
+### 1. Dynamic API URL Construction
+
+```java
+Map<String, Object> variables = Map.of(
+    "apiBaseUrl", "https://api.example.com",
+    "version", "v1",
+    "userId", 12345
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String url = interpolator.interpolate(
+    "${apiBaseUrl}/${version}/users/${userId}"
+);
+// Result: "https://api.example.com/v1/users/12345"
+```
+
+### 2. Conditional Message Formatting
+
+```java
+Map<String, Object> variables = Map.of(
+    "userName", "Alice",
+    "itemCount", 5,
+    "orderTotal", 129.99,
+    "isPremium", true
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String message = interpolator.interpolate(
+    "Hello ${userName}, your order of ${itemCount} " +
+    "${itemCount == 1 ? 'item' : 'items'} " +
+    "totals $${orderTotal}. " +
+    "${isPremium ? 'Free shipping applied!' : 'Add $20 for free shipping.'}"
+);
+// Result: "Hello Alice, your order of 5 items totals $129.99. Free shipping applied!"
+```
+
+### 3. Report Generation
+
+```java
+Map<String, Object> data = Map.of(
+    "reportDate", "2026-01-16",
+    "totalSales", 45678.90,
+    "orderCount", 234,
+    "avgOrderValue", 195.25,
+    "topProduct", "Widget Pro"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(data);
+
+String report = interpolator.interpolate(
+    """
+    Sales Report - ${reportDate}
+    =============================
+    Total Sales:     $${totalSales}
+    Order Count:     ${orderCount}
+    Avg Order Value: $${avgOrderValue}
+    Top Product:     ${topProduct}
+    
+    Performance: ${totalSales > 40000 ? 'Excellent' : 'Good'}
+    """
+);
+```
+
+### 4. Configuration Templates
+
+```java
+Map<String, Object> config = Map.of(
+    "environment", "production",
+    "dbHost", "db.prod.example.com",
+    "dbPort", 5432,
+    "dbName", "myapp",
+    "cacheEnabled", true,
+    "cacheHost", "cache.prod.example.com",
+    "maxConnections", 100
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(config);
+
+String jdbcUrl = interpolator.interpolate(
+    "jdbc:postgresql://${dbHost}:${dbPort}/${dbName}"
+);
+// Result: "jdbc:postgresql://db.prod.example.com:5432/myapp"
+
+String cacheConfig = interpolator.interpolate(
+    "Cache: ${cacheEnabled ? cacheHost : 'disabled'}"
+);
+// Result: "Cache: cache.prod.example.com"
+```
+
+### 5. Email Template
+
+```java
+Map<String, Object> emailData = Map.of(
+    "recipientName", "John Doe",
+    "senderName", "Support Team",
+    "ticketNumber", "TKT-12345",
+    "issueType", "Technical",
+    "priority", "High",
+    "estimatedResolution", "24 hours"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(emailData);
+
+String emailBody = interpolator.interpolate(
+    """
+    Dear ${recipientName},
+    
+    Thank you for contacting us. Your ${issueType} support ticket
+    (${ticketNumber}) has been created with ${priority} priority.
+    
+    ${priority == 'High' ? 'Our team is working on this urgently.' :
+     'Our team will respond soon.'}
+    
+    Estimated resolution time: ${estimatedResolution}
+    
+    Best regards,
+    ${senderName}
+    """
+);
+```
+
+### 6. Dynamic Query Builder
+
+```java
+Map<String, Object> queryParams = Map.of(
+    "table", "users",
+    "fields", List.of("id", "name", "email"),
+    "where", "status = 'active'",
+    "orderBy", "created_at",
+    "limit", 100
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(queryParams);
+
+// Note: This is for demonstration. Use parameterized queries in production!
+String query = interpolator.interpolate(
+    "SELECT ${fields[0]}, ${fields[1]}, ${fields[2]} " +
+    "FROM ${table} " +
+    "WHERE ${where} " +
+    "ORDER BY ${orderBy} " +
+    "LIMIT ${limit}"
+);
+```
+
+### 7. JSON-Like Structure Navigation
+
+Navigate complex nested data structures:
+
+```java
+Map<String, Object> response = Map.of(
+    "status", 200,
+    "data", Map.of(
+        "user", Map.of(
+            "id", 123,
+            "profile", Map.of(
+                "firstName", "John",
+                "lastName", "Doe",
+                "contacts", Map.of(
+                    "email", "john@example.com",
+                    "phone", "+1234567890"
+                )
+            ),
+            "metadata", Map.of(
+                "createdAt", "2026-01-01",
+                "status", "active"
+            )
+        )
+    )
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(response);
+
+String email = interpolator.interpolate("${data.user.profile.contacts.email}");
+// Result: "john@example.com"
+
+String fullName = interpolator.interpolate(
+    "${data.user.profile.firstName} ${data.user.profile.lastName}"
+);
+// Result: "John Doe"
+
+String isActive = interpolator.interpolate(
+    "Status: ${data.user.metadata.status == 'active' ? 'Active User' : 'Inactive'}"
+);
+// Result: "Status: Active User"
+```
+
+### 8. Pagination Information Display
+
+```java
+Map<String, Object> pagination = Map.of(
+    "currentPage", 3,
+    "pageSize", 20,
+    "totalItems", 157,
+    "totalPages", 8
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(pagination);
+
+String display = interpolator.interpolate(
+    "Showing page ${currentPage} of ${totalPages} " +
+    "(${(currentPage - 1) * pageSize + 1}-" +
+    "${currentPage * pageSize > totalItems ? totalItems : currentPage * pageSize} " +
+    "of ${totalItems} items)"
+);
+// Result: "Showing page 3 of 8 (41-60 of 157 items)"
+```
+
+### 9. Shopping Cart Calculation
+
+```java
+Map<String, Object> cart = Map.of(
+    "items", List.of(
+        Map.of("name", "Widget", "price", 29.99, "qty", 2),
+        Map.of("name", "Gadget", "price", 49.99, "qty", 1),
+        Map.of("name", "Gizmo", "price", 19.99, "qty", 3)
+    ),
+    "itemCount", 3,
+    "subtotal", 169.94,
+    "tax", 13.60,
+    "total", 183.54
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(cart);
+
+String summary = interpolator.interpolate(
+    "Cart: ${itemCount} item(s), Subtotal: $${subtotal}, " +
+    "Tax: $${tax}, Total: $${total}"
+);
+// Result: "Cart: 3 item(s), Subtotal: $169.94, Tax: $13.6, Total: $183.54"
+
+// Individual item details
+String firstItem = interpolator.interpolate(
+    "${items[0].name}: ${items[0].qty} x $${items[0].price}"
+);
+// Result: "Widget: 2 x $29.99"
+```
+
+### 10. Validation Error Messages
+
+```java
+Map<String, Object> error = Map.of(
+    "field", "email",
+    "value", "invalid-email",
+    "constraint", "must be a valid email address",
+    "code", "INVALID_FORMAT"
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(error);
+
+String message = interpolator.interpolate(
+    "Validation failed: '${field}' ${constraint}. " +
+    "Provided value: '${value}' [${code}]"
+);
+// Result: "Validation failed: 'email' must be a valid email address. 
+//          Provided value: 'invalid-email' [INVALID_FORMAT]"
+```
+
+### 11. Time-Based Greeting
+
+```java
+import java.time.LocalTime;
+
+Map<String, Object> data = Map.of(
+    "userName", "Alice",
+    "hour", LocalTime.now().getHour()
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(data);
+
+String greeting = interpolator.interpolate(
+    "${hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening')}, " +
+    "${userName}!"
+);
+// Result depends on time: "Good morning, Alice!" or "Good afternoon, Alice!" etc.
+```
+
+### 12. Feature Flag Configuration
+
+```java
+Map<String, Object> features = Map.of(
+    "darkMode", true,
+    "betaFeatures", false,
+    "maxUploadSize", 50,
+    "allowedFileTypes", List.of("pdf", "doc", "xlsx")
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(features);
+
+String config = interpolator.interpolate(
+    "Dark mode: ${darkMode ? 'enabled' : 'disabled'}, " +
+    "Beta: ${betaFeatures ? 'enabled' : 'disabled'}, " +
+    "Max upload: ${maxUploadSize}MB, " +
+    "Allowed types: ${allowedFileTypes[0]}, ${allowedFileTypes[1]}, ${allowedFileTypes[2]}"
+);
+// Result: "Dark mode: enabled, Beta: disabled, Max upload: 50MB, 
+//          Allowed types: pdf, doc, xlsx"
+```
+
+## Best Practices
+
+### 1. Variable Naming
+
+Use clear, descriptive variable names:
+
+```java
+// Good
+Map<String, Object> variables = Map.of(
+    "userName", "Alice",
+    "orderTotal", 99.99,
+    "isActive", true
+);
+
+// Avoid
+Map<String, Object> variables = Map.of(
+    "u", "Alice",      // unclear
+    "t", 99.99,        // unclear
+    "a", true          // unclear
+);
+```
+
+### 2. Reuse Interpolators
+
+Create once, use many times:
+
+```java
+// Good - reuse interpolator
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String message1 = interpolator.interpolate(template1);
+String message2 = interpolator.interpolate(template2);
+String message3 = interpolator.interpolate(template3);
+
+// Avoid - creating new interpolator each time
+String message1 = JakartaElStringInterpolator
+    .forVariables(variables)
+    .interpolate(template1);
+```
+
+### 3. Check for Placeholders
+
+Before interpolating, check if needed:
+
+```
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String template = getTemplate();
+
+if (interpolator.containsPlaceholders(template)) {
+    String result = interpolator.interpolate(template);
+    // use result
+} else {
+    // use template directly, no interpolation needed
+}
+```
+
+### 4. Handle Null Safely
+
+Use null checks in expressions:
+
+```
+Map<String, Object> data = new HashMap<>();
+data.put("value", null);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(data);
+
+// Good - null-safe
+String result = interpolator.interpolate(
+    "${value != null ? value : 'default'}"
+);
+
+// Risky - may cause issues if value is null and you try to access properties
+// String result = interpolator.interpolate("${value.someProperty}");
+```
+
+### 5. Avoid Reserved Words as Variable Names
+
+EL has reserved keywords that should not be used as variable names:
+
+```java
+// Avoid using these as variable names:
+// - empty
+// - null
+// - true
+// - false
+// - not
+// - and
+// - or
+// - div
+// - mod
+
+// Bad - 'empty' is a reserved operator
+Map<String, Object> bad = Map.of("empty", "");
+
+// Good - use descriptive names
+Map<String, Object> good = Map.of("emptyString", "");
+```
+
+### 6. Use Builder for Complex Configurations
+
+When combining multiple sources:
+
+```
+// Good - clear and flexible
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .workflowContext(context)
+        .variable("appVersion", "1.0.0")
+        .variable("environment", "prod")
+        .addVariables(configMap)
+        .strict(true)
+        .build();
+
+// Less clear - harder to maintain
+Map<String, Object> allVars = new HashMap<>(context.asMap());
+allVars.put("appVersion", "1.0.0");
+allVars.put("environment", "prod");
+allVars.putAll(configMap);
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(allVars);
+```
+
+### 7. Prefer Simple Expressions
+
+Keep expressions readable:
+
+```java
+// Good - simple and clear
+String result = interpolator.interpolate(
+    "User: ${user.name}, Age: ${user.age}"
+);
+
+// Acceptable - moderate complexity
+String status = interpolator.interpolate(
+    "Status: ${user.age >= 18 ? 'adult' : 'minor'}"
+);
+
+// Avoid - too complex, hard to maintain
+String complex = interpolator.interpolate(
+    "${user.age < 13 ? 'child' : (user.age < 20 ? 'teen' : " +
+    "(user.age < 65 ? 'adult' : 'senior'))} - " +
+    "${user.isActive && user.hasPermission && !user.isSuspended ? 'active' : 'inactive'}"
+);
+
+// Better - break into multiple interpolations
+String ageCategory = interpolator.interpolate(
+    "${user.age < 13 ? 'child' : (user.age < 20 ? 'teen' : 'adult')}"
+);
+String accountStatus = interpolator.interpolate(
+    "${user.isActive && user.hasPermission ? 'active' : 'inactive'}"
+);
+String combined = ageCategory + " - " + accountStatus;
+```
+
+### 8. Handle Special Characters Properly
+
+Be aware of escape sequences:
+
+```java
+// Paths with backslashes
+Map<String, Object> vars = Map.of(
+    "path", "C:\\Users\\Documents"  // Java escaping
+);
+String result = interpolator.interpolate("Path: ${path}");
+// Result: "Path: C:\Users\Documents"
+
+// Quotes in strings
+Map<String, Object> vars2 = Map.of(
+    "quote", "He said \"Hello\""  // Java escaping
+);
+String result2 = interpolator.interpolate("${quote}");
+// Result: "He said "Hello""
+```
+
+### 9. Use Appropriate Collections
+
+Choose the right collection type:
+
+```java
+// Use List for ordered, indexed access
+List<String> items = List.of("first", "second", "third");
+// ${items[0]}, ${items[1]}
+
+// Use Set for uniqueness checks
+Set<String> tags = Set.of("java", "spring", "docker");
+// ${tags.contains('java')}
+
+// Use Map for key-value lookups
+Map<String, Object> config = Map.of("host", "localhost", "port", 8080);
+// ${config.host}, ${config['port']}
+```
+
+### 10. Leverage Stream API Wisely
+
+Use streams for complex filtering, but keep it readable:
+
+```java
+List<Integer> numbers = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+// Good - clear intent
+String hasEven = interpolator.interpolate(
+    "${numbers.stream().anyMatch(n -> n % 2 == 0)}"
+);
+
+// Good - simple filter and count
+String shortCount = interpolator.interpolate(
+    "${words.stream().filter(w -> w.length() < 5).count()}"
+);
+
+// Avoid - too complex for inline expression
+// Consider pre-processing data instead
+```
+
+### 11. Performance Considerations
+
+Optimize for repeated use:
+
+```
+// Good - create interpolator once, reuse
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(sharedVariables);
+
+for (String template : templates) {
+    String result = interpolator.interpolate(template);
+    process(result);
+}
+
+// Avoid - creating new interpolator in loop
+for (String template : templates) {
+    JakartaElStringInterpolator interp = 
+        JakartaElStringInterpolator.forVariables(sharedVariables);
+    String result = interp.interpolate(template);
+    process(result);
+}
+```
+
+### 12. Test Edge Cases
+
+Ensure your templates handle edge cases:
+
+```
+// Test with empty collections
+Map<String, Object> test1 = Map.of("items", List.of());
+// Should handle: ${empty items}, ${items.size()}
+
+// Test with null values
+Map<String, Object> test2 = new HashMap<>();
+test2.put("value", null);
+// Should handle: ${value != null ? value : 'default'}
+
+// Test with special characters
+Map<String, Object> test3 = Map.of(
+    "path", "C:\\Users\\Docs",
+    "quote", "She said \"Hi\""
+);
+// Should preserve special characters correctly
+```
+
+The interpolator handles null input gracefully:
+
+```
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+String result = interpolator.interpolate(null);
+// Returns: null (no exception)
+
+result = interpolator.interpolate("");
+// Returns: "" (empty string)
+
+result = interpolator.interpolate("  ");
+// Returns: "  " (whitespace preserved)
+```
+
+### 5. Use Strict Mode for Validation
+
+Validate templates during initialization:
+
+```
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+// Validate template at startup
+try {
+    interpolator.interpolate(template, true);  // strict mode
+    // Template is valid
+} catch (InterpolationException e) {
+    // Template has invalid placeholders
+    throw new IllegalStateException("Invalid template", e);
+}
+```
+
+### 6. Separate Configuration from Templates
+
+```java
+// Good - separate concerns
+public class EmailService {
+    private final JakartaElStringInterpolator interpolator;
+    private final String welcomeEmailTemplate;
+    
+    public EmailService(Map<String, Object> config, String template) {
+        this.interpolator = JakartaElStringInterpolator.forVariables(config);
+        this.welcomeEmailTemplate = template;
+    }
+    
+    public String generateWelcomeEmail(Map<String, Object> userData) {
+        // Merge config with user data
+        JakartaElStringInterpolator emailInterpolator = 
+            JakartaElStringInterpolator.builder()
+                .addVariables(interpolator.getVariables())
+                .addVariables(userData)
+                .build();
+        
+        return emailInterpolator.interpolate(welcomeEmailTemplate);
+    }
+}
+```
+
+### 7. Validate Complex Expressions
+
+Test complex expressions separately:
+
+```
+// Test complex expression separately
+String complexExpression = "${(price * quantity) * (1 - discount)}";
+
+Map<String, Object> testVars = Map.of(
+    "price", 10.0,
+    "quantity", 2,
+    "discount", 0.1
+);
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(testVars);
+
+String result = interpolator.interpolate(complexExpression);
+assertEquals("18.0", result);  // Verify calculation
+```
+
+### 8. Document Template Variables
+
+Document expected variables in templates:
+
+```java
+/**
+ * Email template for order confirmation.
+ * 
+ * <pre>
+ * Required variables:
+ * - customerName (String): Customer's full name
+ * - orderNumber (String): Order identifier
+ * - orderTotal (Number): Total order amount
+ * - itemCount (Number): Number of items in order
+ * - estimatedDelivery (String): Delivery date
+ * </pre>
+ */
+String orderConfirmationTemplate = """
+    Dear ${customerName},
+    
+    Your order ${orderNumber} has been confirmed!
+    
+    Order Summary:
+    - Items: ${itemCount}
+    - Total: $${orderTotal}
+    - Estimated Delivery: ${estimatedDelivery}
+    """;
+```
 
 ## Error Handling
 
 ### InterpolationException
 
-The main exception type for interpolation errors:
+All interpolation errors throw `InterpolationException`:
 
 ```java
+import com.workflow.interpolation.exception.InterpolationException;
+
 public void example() {
     try {
-        String result = Interpolation.interpolate("${missing}", true);
+        JakartaElStringInterpolator interpolator =
+                JakartaElStringInterpolator.builder()
+                        .variable("x", 1)
+                        .strict(true)
+                        .build();
+
+        String result = interpolator.interpolate("${unknown}");
+
     } catch (InterpolationException e) {
-        // Get the placeholder that failed
+        // Handle interpolation error
+        System.err.println("Interpolation failed: " + e.getMessage());
+
+        // Get the problematic placeholder (if available)
         String placeholder = e.getPlaceholder();
+        if (placeholder != null) {
+            System.err.println("Failed placeholder: " + placeholder);
+        }
 
-        // Get the error message
-        String message = e.getMessage();
-
-        System.err.println("Failed to resolve '" + e.getPlaceholder() + "': " + e.getMessage());
+        // Get underlying cause (if any)
+        Throwable cause = e.getCause();
+        if (cause != null) {
+            System.err.println("Root cause: " + cause.getMessage());
+        }
     }
 }
 ```
 
 ### Common Error Scenarios
 
-#### 1. Unresolved Placeholder (Strict Mode)
+#### 1. Unresolved Variable (Strict Mode)
 
 ```java
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .variable("x", 1)
+        .strict(true)
+        .build();
+
 public void example() {
     try {
-        Interpolation.interpolate("${undefined.key}", true);
+        interpolator.interpolate("${unknownVariable}");
     } catch (InterpolationException e) {
-        // e.getMessage() -> "Unable to resolve placeholder: ${undefined.key}"
-        // e.getPlaceholder() -> "undefined.key"
+        // Error: Unable to resolve EL expression
     }
 }
 ```
 
-#### 2. Circular Reference
+#### 2. Invalid Property Access
 
 ```java
-public void example() {
-    System.setProperty("a", "${b}");
-    System.setProperty("b", "${c}");
-    System.setProperty("c", "${a}");
+Map<String, Object> variables = Map.of("user", Map.of("name", "Alice"));
 
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
+public void example() {
     try {
-        Interpolation.interpolate("${a}");
+        interpolator.interpolate("${user.nonExistentProperty}", true);
     } catch (InterpolationException e) {
-        // e.getMessage() -> "Circular reference detected for key: a"
+        // Error: Property not found
     }
 }
 ```
 
-#### 3. Maximum Depth Exceeded
+#### 3. Type Errors
 
 ```java
+Map<String, Object> variables = Map.of("text", "hello");
+
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
+
 public void example() {
-    // Create deeply nested properties
-    System.setProperty("level.1", "${level.2}");
-    System.setProperty("level.2", "${level.3}");
-    // ... many levels ...
-    System.setProperty("level.15", "value");
-
-    StringInterpolator interpolator = DefaultStringInterpolator.builder()
-            .addResolver(new SystemPropertiesResolver())
-            .maxDepth(5)
-            .build();
-
     try {
-        interpolator.interpolate("${level.1}");
+        // Attempting to call method that doesn't exist
+        interpolator.interpolate("${text.invalidMethod()}", true);
     } catch (InterpolationException e) {
-        // e.getMessage() -> "Maximum interpolation depth (5) exceeded..."
+        // Error: Method not found
     }
 }
 ```
 
----
+### Error Handling Strategies
 
-## Best Practices
-
-### 1. Use Default Values for Optional Properties
-
-Always provide defaults for optional configuration:
+#### 1. Fail-Fast (Strict)
 
 ```java
-String timeout = Interpolation.interpolate("${http.timeout:-30000}");
-String retries = Interpolation.interpolate("${http.retries:-3}");
-```
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .addVariables(variables)
+        .strict(true)
+        .build();
 
-### 2. Enable Strict Mode for Critical Configuration
-
-Use strict mode when missing configuration should fail fast:
-
-```java
-// Application startup - fail if critical config is missing
-String dbUrl = Interpolation.interpolate("${database.url}", true);
-String apiKey = Interpolation.interpolate("${api.key}", true);
-```
-
-### 3. Reuse Interpolators for Better Performance
-
-Create and reuse interpolators instead of recreating them:
-
-```java
-// At application startup
-private static final StringInterpolator CONFIG_INTERPOLATOR = 
-    Interpolation.forProperties(applicationConfig);
-
-// During execution
-String value = CONFIG_INTERPOLATOR.interpolate("${some.key}");
-```
-
-### 4. Use Appropriate Resolver Priority
-
-Place more specific resolvers before generic ones:
-
-```java
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new ApplicationConfigResolver())  // Most specific
-    .addResolver(new DatabaseConfigResolver())
-    .addResolver(new SystemPropertiesResolver())
-    .addResolver(new EnvironmentPropertyResolver()) // Most generic
-    .build();
-```
-
-### 5. Document Expected Placeholders
-
-Clearly document which placeholders are expected:
-
-```java
-/**
- * Processes the notification template.
- * <p><
- * Expected placeholders:
- * - ${user.name}: The recipient's name
- * - ${notification.message}: The notification content
- * - ${app.name}: Application name (optional, defaults to "MyApp")
- */
-public String processNotificationTemplate(String template, WorkflowContext context) {
-    return Interpolation.interpolate(template, context);
-}
-```
-
-### 6. Validate Input Before Interpolation
-
-Check for placeholders before attempting interpolation:
-
-```java
 public void example() {
-    if (Interpolation.containsPlaceholders(input)) {
-        return Interpolation.interpolate(input, context);
-    } else {
-        return input; // No interpolation needed
+    try {
+        String result = interpolator.interpolate(template);
+        processResult(result);
+    } catch (InterpolationException e) {
+        logger.error("Template interpolation failed", e);
+        throw new BusinessException("Invalid template", e);
     }
 }
 ```
 
-### 7. Handle Sensitive Data Carefully
-
-Be cautious with interpolation of sensitive values:
+#### 2. Graceful Degradation (Non-Strict)
 
 ```java
-public void example() {
-    // DON'T log interpolated sensitive data
-    String apiKey = Interpolation.interpolate("${api.key}");
-    logger.info("API Key: " + apiKey); // Security risk!
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.builder()
+        .addVariables(variables)
+        .strict(false)  // default
+        .build();
 
-    // DO use secure handling
-    String apiKey = Interpolation.interpolate("${api.key}");
-    // Use the key without logging it
-}
+String result = interpolator.interpolate(template);
+// Unresolved placeholders remain as ${...}
+// Application continues normally
 ```
 
-### 8. Use Type-Safe Context Keys
-
-Define constants for commonly used context keys:
+#### 3. Fallback Values
 
 ```java
-public class ContextKeys {
-    public static final String USER_ID = "userId";
-    public static final String SESSION_ID = "sessionId";
-    public static final String REQUEST_ID = "requestId";
-}
+JakartaElStringInterpolator interpolator = 
+    JakartaElStringInterpolator.forVariables(variables);
 
-// Usage
-public void example() {
-    context.put(ContextKeys.USER_ID, "USER-123");
-    String message = Interpolation.interpolate(
-            "User ${userId} initiated request",
-            context
-    );
-}
-```
-
----
-
-## Examples
-
-### Example 1: HTTP Request Configuration
-
-```java
-public void example() {
-    Map<String, String> config = Map.of(
-            "api.base.url", "https://api.example.com",
-            "api.version", "v1",
-            "api.key", "secret-key-123"
-    );
-
-    WorkflowContext context = new WorkflowContext();
-    context.put("endpoint", "users");
-    context.put("userId", "12345");
-
-    StringInterpolator interpolator =
-            Interpolation.forContextAndProperties(context, config);
-
-    // Build the complete URL
-    String url = interpolator.interpolate(
-            "${api.base.url}/${api.version}/${endpoint}/${userId}"
-    );
-    // Result: "https://api.example.com/v1/users/12345"
-
-    // Build authorization header
-    String authHeader = interpolator.interpolate("Bearer ${api.key}");
-    // Result: "Bearer secret-key-123"
-}
-```
-
-### Example 2: Database Connection String
-
-```java
-Map<String, String> dbConfig = Map.of(
-    "db.host", "localhost",
-    "db.port", "5432",
-    "db.name", "myapp_db",
-    "db.user", "admin"
-);
-
-String connectionUrl = Interpolation.interpolate(
-    "jdbc:postgresql://${db.host}:${db.port}/${db.name}?user=${db.user}",
-    dbConfig
-);
-// Result: "jdbc:postgresql://localhost:5432/myapp_db?user=admin"
-```
-
-### Example 3: Email Template Processing
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("user.firstName", "John");
-    context.put("user.lastName", "Doe");
-    context.put("user.email", "john.doe@example.com");
-    context.put("order.id", "ORD-789456");
-    context.put("order.total", "$149.99");
-
-    String emailTemplate = """
-            Dear ${user.firstName} ${user.lastName},
-            
-            Your order ${order.id} has been confirmed!
-            Total amount: ${order.total}
-            
-            Thank you for shopping with us.
-            
-            Best regards,
-            ${app.name:-Our Store}
-            """;
-
-    String processedEmail = Interpolation.interpolate(emailTemplate, context);
-}
-```
-
-### Example 4: Dynamic SQL Query
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("schema", "public");
-    context.put("tableName", "users");
-    context.put("whereClause", "status = 'active'");
-    context.put("limit", "100");
-
-    String query = Interpolation.interpolate(
-            "SELECT * FROM ${schema}.${tableName} WHERE ${whereClause} LIMIT ${limit}",
-            context
-    );
-    // Result: "SELECT * FROM public.users WHERE status = 'active' LIMIT 100"
-}
-```
-
-### Example 5: File Path Construction
-
-```java
-public void example() {
-    System.setProperty("user.home", "/home/john");
-    System.setProperty("app.data.dir", "${user.home}/.myapp/data");
-
-    String logFile = Interpolation.interpolate(
-            "${app.data.dir}/logs/application-${date:-latest}.log"
-    );
-    // Result: "/home/john/.myapp/data/logs/application-latest.log"
-}
-```
-
-### Example 6: Environment-Specific Configuration
-
-```java
-// Set environment variable (typically done outside the app)
-// export APP_ENV=production
-// export DATABASE_URL=postgres://prod-db:5432/myapp
+String result = interpolator.interpolate(template, false);
 
 public void example() {
-    String environment = Interpolation.interpolate("${APP_ENV:-development}");
-
-    if ("production".equals(environment)) {
-        String dbUrl = Interpolation.interpolate("${DATABASE_URL}", true);
-        // Will throw exception if DATABASE_URL is not set in production
-    } else {
-        String dbUrl = Interpolation.interpolate(
-                "${DATABASE_URL:-jdbc:h2:mem:testdb}"
-        );
+    // Check if interpolation was complete
+    if (interpolator.containsPlaceholders(result)) {
+        logger.warn("Template has unresolved placeholders: {}", result);
+        // Use default message
+        result = "Default message";
     }
 }
 ```
-
-### Example 7: Multi-Environment Workflow
-
-```java
-public void example() {
-    Map<String, String> envConfig = new HashMap<>();
-
-    // Load environment-specific configuration
-    String env = System.getenv("ENVIRONMENT");
-    if ("production".equals(env)) {
-        envConfig.put("log.level", "INFO");
-        envConfig.put("cache.size", "10000");
-        envConfig.put("db.pool.size", "50");
-    } else {
-        envConfig.put("log.level", "DEBUG");
-        envConfig.put("cache.size", "100");
-        envConfig.put("db.pool.size", "5");
-    }
-
-    Workflow workflow = SequentialWorkflow.builder()
-            .name("ConfigurableWorkflow")
-            .task(context -> {
-                String logLevel = Interpolation.interpolate("${log.level}", envConfig);
-                context.put("configuredLogLevel", logLevel);
-            })
-            .build();
-}
-```
-
-### Example 8: Custom Resolver for External Service
-
-```java
-public class ConsulPropertyResolver implements PropertyResolver {
-    
-    private final ConsulClient consulClient;
-    
-    public ConsulPropertyResolver(ConsulClient consulClient) {
-        this.consulClient = consulClient;
-    }
-    
-    @Override
-    public Optional<String> resolve(String key) {
-        try {
-            Response<GetValue> response = consulClient.getKVValue(key);
-            if (response.getValue() != null) {
-                String value = response.getValue().getDecodedValue();
-                return Optional.ofNullable(value);
-            }
-        } catch (Exception e) {
-            // Log error
-        }
-        return Optional.empty();
-    }
-    
-    @Override
-    public int order() {
-        return 150; // Between WorkflowContext (100) and System (200)
-    }
-}
-
-// Usage
-StringInterpolator interpolator = DefaultStringInterpolator.builder()
-    .addResolver(new ConsulPropertyResolver(consulClient))
-    .addResolver(new SystemPropertiesResolver())
-    .addResolver(new EnvironmentPropertyResolver())
-    .build();
-
-String serviceUrl = interpolator.interpolate("${service.user.api.url}");
-```
-
----
 
 ## API Reference
 
-### Interpolation Class
+### JakartaElStringInterpolator
 
-Main utility class for string interpolation.
+#### Static Factory Methods
 
-#### Static Methods
+```java
+// Create from variables map
+static JakartaElStringInterpolator forVariables(Map<String, Object> variables);
 
-| Method                                                                        | Description                                                                       |
-|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| `String interpolate(String input)`                                            | Interpolate using default resolvers (system properties and environment variables) |
-| `String interpolate(String input, boolean strict)`                            | Interpolate with strict mode control                                              |
-| `String interpolate(String input, WorkflowContext context)`                   | Interpolate using workflow context                                                |
-| `String interpolate(String input, WorkflowContext context, boolean strict)`   | Interpolate using workflow context with strict mode                               |
-| `String interpolate(String input, Map<String, ?> properties)`                 | Interpolate using custom properties map                                           |
-| `String interpolate(String input, Map<String, ?> properties, boolean strict)` | Interpolate using custom properties with strict mode                              |
-| `boolean containsPlaceholders(String input)`                                  | Check if string contains any placeholders                                         |
-| `StringInterpolator forContext(WorkflowContext context)`                      | Create interpolator for workflow context                                          |
-| `StringInterpolator forProperties(Map<String, ?> properties)`                 | Create interpolator for custom properties                                         |
-| `StringInterpolator forContextAndProperties(WorkflowContext, Map<String, ?>)` | Create interpolator for both context and properties                               |
-| `StringInterpolator defaultInterpolator()`                                    | Get the default interpolator instance                                             |
-| `DefaultStringInterpolator.Builder builder()`                                 | Get a builder for custom interpolators                                            |
+// Create from WorkflowContext
+static JakartaElStringInterpolator forContext(WorkflowContext context);
 
-### StringInterpolator Interface
+// Create from context and additional variables
+static JakartaElStringInterpolator forContextAndVariables(
+    WorkflowContext context, 
+    Map<String, Object> additionalVariables
+);
 
-Core interface for interpolation functionality.
+// Create builder
+static Builder builder();
+```
 
-#### Methods
+#### Instance Methods
 
-| Method                                             | Description                                |
-|----------------------------------------------------|--------------------------------------------|
-| `String interpolate(String input)`                 | Interpolate all placeholders in the string |
-| `String interpolate(String input, boolean strict)` | Interpolate with strict mode control       |
-| `boolean containsPlaceholders(String input)`       | Check if string contains placeholders      |
+```java
+// Interpolate with default strict mode
+String interpolate(String input);
 
-### DefaultStringInterpolator Class
+// Interpolate with explicit strict mode
+String interpolate(String input, boolean strict);
 
-Default implementation of `StringInterpolator`.
+// Check for placeholders
+boolean containsPlaceholders(String input);
+
+// Get default strict mode setting
+boolean isStrictByDefault();
+```
 
 #### Builder Methods
 
-| Method                                                   | Description                               |
-|----------------------------------------------------------|-------------------------------------------|
-| `Builder addResolver(PropertyResolver resolver)`         | Add a resolver to the chain               |
-| `Builder addResolvers(List<PropertyResolver> resolvers)` | Add multiple resolvers                    |
-| `Builder resolver(PropertyResolver resolver)`            | Set a single resolver (clears existing)   |
-| `Builder maxDepth(int maxDepth)`                         | Set maximum recursion depth (default: 10) |
-| `Builder strict(boolean strict)`                         | Set default strict mode (default: false)  |
-| `DefaultStringInterpolator build()`                      | Build the interpolator                    |
-
-#### Static Methods
-
-| Method                                     | Description                                             |
-|--------------------------------------------|---------------------------------------------------------|
-| `Builder builder()`                        | Create a new builder                                    |
-| `DefaultStringInterpolator withDefaults()` | Create with system properties and environment variables |
-
-### PropertyResolver Interface
-
-Strategy interface for resolving property values.
-
-#### Methods
-
-| Method                                 | Description                                                  |
-|----------------------------------------|--------------------------------------------------------------|
-| `Optional<String> resolve(String key)` | Resolve a property value by key                              |
-| `int order()`                          | Get the priority order (default: 0, lower = higher priority) |
-| `boolean supports(String key)`         | Check if this resolver supports the key (default: true)      |
-
-### Built-in Resolver Classes
-
-| Class                             | Default Order  | Description                         |
-|-----------------------------------|----------------|-------------------------------------|
-| `MapPropertyResolver`             | 50             | Resolves from custom Map            |
-| `WorkflowContextPropertyResolver` | 100            | Resolves from WorkflowContext       |
-| `SystemPropertiesResolver`        | 200            | Resolves from system properties     |
-| `EnvironmentPropertyResolver`     | 300            | Resolves from environment variables |
-| `CompositePropertyResolver`       | N/A            | Chains multiple resolvers           |
+```java
+class Builder {
+    // Set all variables (replaces existing)
+    Builder variables(Map<String, Object> variables);
+    
+    // Add single variable
+    Builder variable(String name, Object value);
+    
+    // Add multiple variables (merges with existing)
+    Builder addVariables(Map<String, Object> variables);
+    
+    // Set workflow context
+    Builder workflowContext(WorkflowContext context);
+    
+    // Alias for workflowContext
+    Builder context(WorkflowContext context);
+    
+    // Set default strict mode
+    Builder strict(boolean strict);
+    
+    // Build the interpolator
+    JakartaElStringInterpolator build();
+}
+```
 
 ### InterpolationException
 
-Exception thrown when interpolation fails.
+#### Constructors
+
+```java
+InterpolationException(String message);
+InterpolationException(String message, String placeholder);
+InterpolationException(String message, Throwable cause);
+InterpolationException(String message, String placeholder, Throwable cause);
+```
 
 #### Methods
 
-| Method                    | Description                                              |
-|---------------------------|----------------------------------------------------------|
-| `String getPlaceholder()` | Get the placeholder that failed to resolve (may be null) |
-| `String getMessage()`     | Get the error message                                    |
-
----
-
-## Integration with Workflows
-
-String interpolation can be seamlessly integrated into workflows:
-
-### In Task Configuration
-
 ```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("apiEndpoint", "https://api.example.com/users");
-    context.put("apiKey", "secret-123");
+// Get the problematic placeholder (maybe null)
+String getPlaceholder();
 
-    Workflow workflow = SequentialWorkflow.builder()
-            .name("API Workflow")
-            .task(ctx -> {
-                String url = Interpolation.interpolate("${apiEndpoint}", ctx);
-                String authHeader = Interpolation.interpolate("Bearer ${apiKey}", ctx);
-
-                // Use in HTTP request
-                // ... HTTP client code ...
-            })
-            .build();
-}
+// Standard exception methods
+String getMessage();
+Throwable getCause();
 ```
-
-### In Conditional Workflows
-
-```java
-ConditionalWorkflow workflow = ConditionalWorkflow.builder()
-    .name("Environment-Based Workflow")
-    .condition(ctx -> {
-        String env = Interpolation.interpolate(
-            "${APP_ENV:-development}", 
-            ctx
-        );
-        return "production".equals(env);
-    })
-    .onTrue(productionWorkflow)
-    .onFalse(developmentWorkflow)
-    .build();
-```
-
-### In Database Workflows
-
-```java
-public void example() {
-    WorkflowContext context = new WorkflowContext();
-    context.put("userId", "12345");
-
-    String query = Interpolation.interpolate(
-            "SELECT * FROM users WHERE id = ${userId}",
-            context
-    );
-
-    // Use with JDBC query task
-}
-```
-
----
-
-## Performance Considerations
-
-1. **Reuse Interpolators**: Creating interpolators is relatively expensive. Reuse them when possible.
-
-2. **Check Before Interpolating**: Use `containsPlaceholders()` to avoid unnecessary interpolation work.
-
-3. **Limit Nesting Depth**: Deep nesting requires more recursion. Keep configurations reasonably flat.
-
-4. **Resolver Ordering**: Place faster/more specific resolvers first for better performance.
-
-5. **Caching**: Consider caching interpolated values if the same strings are processed repeatedly.
-
----
-
-## Thread Safety
-
-- `StringInterpolator` implementations are **thread-safe** and can be shared across threads
-- `PropertyResolver` implementations should be thread-safe if used in concurrent contexts
-- The default interpolator returned by `Interpolation.defaultInterpolator()` is a singleton and thread-safe
-
----
 
 ## Summary
 
-The Workflow Engine's string interpolation system provides:
+The Workflow Engine's string interpolation feature provides:
 
-✅ **Flexible placeholder syntax** with defaults and escaping  
-✅ **Multiple resolution sources** (context, maps, system, environment)  
-✅ **Configurable priority chain** for resolver precedence  
-✅ **Nested interpolation** with circular reference detection  
-✅ **Strict and lenient modes** for error handling  
-✅ **Custom resolvers** for extensibility  
-✅ **Thread-safe implementations** for concurrent use  
-✅ **Integration with workflows** for dynamic configuration  
+✅ **Powerful Expression Language**: Full Jakarta EL 3.0+ support with lambda expressions  
+✅ **Flexible Variable Sources**: Maps, contexts, POJOs, records, collections, arrays  
+✅ **Multiple Expression Types**: Arithmetic, logical, conditional, string operations  
+✅ **Advanced Collection Support**: Lists, Sets, Maps, Arrays (including multi-dimensional)  
+✅ **Stream API Integration**: Filter, map, reduce operations with lambda syntax  
+✅ **Optional Handling**: Safe navigation with Optional values  
+✅ **Null-Safe Operations**: Ternary operators for safe null handling  
+✅ **Special Character Support**: Proper escaping for paths, quotes, newlines  
+✅ **Strict and Non-Strict Modes**: Configurable error handling  
+✅ **WorkflowContext Integration**: Seamless workflow integration  
+✅ **Performance**: Compiled expressions for efficiency  
+✅ **Type Safety**: Proper type handling and coercion  
+✅ **Easy to Use**: Simple API with builder pattern  
+✅ **Comprehensive Testing**: 240+ test cases covering edge cases and real-world scenarios  
 
-Use interpolation to make your workflows more flexible, configurable, and environment-aware!
+### Supported Data Types
+
+- **Primitives**: int, long, double, boolean, etc.
+- **Strings**: With full manipulation methods
+- **Collections**: List, Set, Map with full API access
+- **Arrays**: Primitive and object arrays, multidimensional support
+- **POJOs**: Plain Java objects with getter methods
+- **Records**: Java 14+ record types
+- **Optional**: Java Optional with safe unwrapping
+- **Nested Structures**: Unlimited nesting depth for objects and maps

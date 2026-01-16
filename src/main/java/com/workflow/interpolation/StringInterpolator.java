@@ -1,24 +1,22 @@
 package com.workflow.interpolation;
 
 import com.workflow.interpolation.exception.InterpolationException;
-import com.workflow.interpolation.resolver.PropertyResolver;
 
 /**
- * Interface for string interpolation with placeholder substitution.
+ * Interface for string interpolation, allowing resolution of placeholders within strings.
+ * Placeholders are denoted by the syntax ${key} or ${key:defaultValue}. The implementation should
+ * support resolving these placeholders from a defined source, such as environment variables,
+ * configuration files, or other data sources. The interface also provides methods to check for the
+ * presence of placeholders and to handle strict mode for unresolved placeholders.
  *
- * <p>Implementations resolve placeholders like {@code ${key}} or {@code ${key:-default}} within
- * strings using one or more {@link PropertyResolver} instances.
+ * <pre>
+ * Example placeholders:
+ * - ${username} - resolves to the value associated with 'username'
+ * - ${timeout:30} - resolves to the value associated with 'timeout', or defaults to '30' if not found
+ * </pre>
  *
- * <p><b>Placeholder Syntax:</b>
- *
- * <ul>
- *   <li>{@code ${key}} - Simple placeholder
- *   <li>{@code ${key:-defaultValue}} - Placeholder with default value
- *   <li>{@code \${literal}} - Escaped placeholder (becomes literal {@code ${literal}})
- * </ul>
- *
- * @see PropertyResolver
- * @see DefaultStringInterpolator
+ * @see InterpolationException
+ * @see JakartaElStringInterpolator
  */
 public interface StringInterpolator {
 

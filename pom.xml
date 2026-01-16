@@ -75,6 +75,13 @@
             <version>8.16.0</version>
         </dependency>
 
+        <!-- Jakarta Expression Language for advanced expression interpolation -->
+        <dependency>
+            <groupId>org.glassfish.expressly</groupId>
+            <artifactId>expressly</artifactId>
+            <version>6.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-ratelimiter</artifactId>
