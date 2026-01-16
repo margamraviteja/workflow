@@ -1,4 +1,3 @@
 // Simple test script
-context.put('output', value);
-var value = context.get('input');
-
+ctx.put('output', value);
+var value = ctx.get('input');

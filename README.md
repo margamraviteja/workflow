@@ -24,6 +24,7 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 - **Conditional**: Branch based on runtime conditions
 - **Dynamic Branching**: Multi-way routing with selector functions
 - **Fallback**: Graceful error recovery with primary/fallback pattern
+- **Saga**: Distributed transactions with compensating actions for rollback
 - **Rate Limited**: Control execution frequency with multiple algorithms
 - **Timeout**: Add time constraints to any workflow
 - **JavaScript**: Execute dynamic business logic with full ESM support
@@ -148,6 +149,49 @@ public class OrderProcessor {
                 })
                 .whenTrue(expensiveFlow)
                 .whenFalse(standardFlow)
+                .build();
+    }
+}
+```
+
+### Saga Workflow
+
+```java
+import com.workflow.SagaWorkflow;
+import com.workflow.SagaStep;
+
+public class OrderSagaExample {
+    public Workflow buildOrderSaga() {
+        return SagaWorkflow.builder()
+                .name("OrderProcessingSaga")
+                .step(SagaStep.builder()
+                        .name("ReserveInventory")
+                        .action(ctx -> {
+                            String orderId = ctx.getTyped("orderId", String.class);
+                            String reservationId = inventoryService.reserve(orderId);
+                            ctx.put("reservationId", reservationId);
+                        })
+                        .compensation(ctx -> {
+                            String reservationId = ctx.get("reservationId");
+                            if (reservationId != null) {
+                                inventoryService.release(reservationId);
+                            }
+                        })
+                        .build())
+                .step(SagaStep.builder()
+                        .name("ChargePayment")
+                        .action(ctx -> {
+                            String orderId = ctx.getTyped("orderId", String.class);
+                            String txnId = paymentService.charge(orderId);
+                            ctx.put("transactionId", txnId);
+                        })
+                        .compensation(ctx -> {
+                            String txnId = ctx.get("transactionId");
+                            if (txnId != null) {
+                                paymentService.refund(txnId);
+                            }
+                        })
+                        .build())
                 .build();
     }
 }
@@ -496,6 +540,56 @@ public class ResilientWorkflowFactory {
     }
 }
 ```
+
+### Saga Workflow
+Implements the Saga pattern for distributed transactions with compensating actions.
+
+```java
+import com.workflow.SagaWorkflow;
+import com.workflow.SagaStep;
+import com.workflow.helper.Workflows;
+
+public class SagaWorkflowFactory {
+    public Workflow buildDistributedTransaction() {
+        return SagaWorkflow.builder()
+                .name("PaymentSaga")
+                .step(SagaStep.builder()
+                        .name("ReserveInventory")
+                        .action(reserveInventoryWorkflow)
+                        .compensation(releaseInventoryWorkflow)
+                        .build())
+                .step(SagaStep.builder()
+                        .name("ProcessPayment")
+                        .action(chargePaymentWorkflow)
+                        .compensation(refundPaymentWorkflow)
+                        .build())
+                .step(SagaStep.builder()
+                        .name("SendConfirmation")
+                        .action(sendEmailWorkflow)
+                        // No compensation needed for read-only operations
+                        .build())
+                .build();
+    }
+    
+    // Using convenience methods
+    public Workflow buildSagaWithTasks() {
+        return Workflows.saga("SimpleSaga")
+                .step(actionTask, compensationTask)  // Using tasks
+                .step(ctx -> performWork(ctx),       // Using lambdas
+                      ctx -> rollbackWork(ctx))
+                .build();
+    }
+}
+```
+
+**Key Features:**
+- **Compensating Actions**: Automatic rollback on failure
+- **Backward Recovery**: Executes compensations in reverse order
+- **Failure Context**: Access failure information during compensation
+- **Flexible Steps**: Support for tasks, workflows, or lambda functions
+- **Partial Compensation**: Steps without side effects don't need compensation
+
+For complete Saga workflow documentation, see [SAGA.md](docs/SAGA.md).
 
 ### Rate Limited Workflow
 Wraps any workflow with rate limiting.
@@ -1013,6 +1107,7 @@ The framework includes comprehensive examples demonstrating various patterns in 
 - [Getting Started Guide](docs/GETTING_STARTED.md) - Quick start and common patterns
 - [Task Reference](docs/TASKS.md) - Complete task documentation
 - [Workflow Guide](docs/WORKFLOWS.md) - Detailed workflow documentation
+- [Saga Pattern Guide](docs/SAGA.md) - Distributed transactions with compensating actions
 - [Helper Utilities](docs/HELPERS.md) - Utility classes and helpers
 - [Rate Limiting Guide](docs/RATE_LIMITING.md) - Rate limiting strategies and usage
 - [Workflow Listeners Guide](docs/WORKFLOW_LISTENERS.md) - Event-driven monitoring

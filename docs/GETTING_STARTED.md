@@ -291,6 +291,72 @@ public class FallbackExample {
 }
 ```
 
+### Pattern 6: Saga with Compensation
+
+```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+
+public class SagaExample {
+    public WorkflowResult processOrder(Order order) {
+        // Build saga workflow with compensating actions
+        SagaWorkflow orderSaga = SagaWorkflow.builder()
+                .name("OrderProcessingSaga")
+                .step(SagaStep.builder()
+                        .name("ReserveInventory")
+                        .action(ctx -> {
+                            String orderId = ctx.getTyped("orderId", String.class);
+                            String reservationId = inventoryService.reserve(orderId);
+                            ctx.put("reservationId", reservationId);
+                        })
+                        .compensation(ctx -> {
+                            String reservationId = ctx.get("reservationId");
+                            if (reservationId != null) {
+                                inventoryService.release(reservationId);
+                            }
+                        })
+                        .build())
+                .step(SagaStep.builder()
+                        .name("ProcessPayment")
+                        .action(ctx -> {
+                            Double amount = ctx.getTyped("amount", Double.class);
+                            String txnId = paymentService.charge(amount);
+                            ctx.put("transactionId", txnId);
+                        })
+                        .compensation(ctx -> {
+                            String txnId = ctx.get("transactionId");
+                            if (txnId != null) {
+                                paymentService.refund(txnId);
+                            }
+                        })
+                        .build())
+                .step(SagaStep.builder()
+                        .name("CreateShipment")
+                        .action(ctx -> {
+                            String orderId = ctx.getTyped("orderId", String.class);
+                            String shipmentId = shippingService.createShipment(orderId);
+                            ctx.put("shipmentId", shipmentId);
+                        })
+                        .compensation(ctx -> {
+                            String shipmentId = ctx.get("shipmentId");
+                            if (shipmentId != null) {
+                                shippingService.cancelShipment(shipmentId);
+                            }
+                        })
+                        .build())
+                .build();
+
+        // Execute saga
+        WorkflowContext context = new WorkflowContext();
+        context.put("orderId", order.getId());
+        context.put("amount", order.getTotal());
+        
+        // If any step fails, all previous steps are automatically rolled back
+        return orderSaga.execute(context);
+    }
+}
+```
+
 ## Configuration Options
 
 ### Context Management

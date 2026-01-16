@@ -6,6 +6,7 @@ import com.workflow.DynamicBranchingWorkflow.DynamicBranchingWorkflowBuilder;
 import com.workflow.FallbackWorkflow.FallbackWorkflowBuilder;
 import com.workflow.ParallelWorkflow.ParallelWorkflowBuilder;
 import com.workflow.RateLimitedWorkflow.RateLimitedWorkflowBuilder;
+import com.workflow.SagaWorkflow.SagaWorkflowBuilder;
 import com.workflow.SequentialWorkflow.SequentialWorkflowBuilder;
 import com.workflow.TimeoutWorkflow.TimeoutWorkflowBuilder;
 import lombok.experimental.UtilityClass;
@@ -93,5 +94,16 @@ public class Workflows {
    */
   public static TimeoutWorkflowBuilder timeout(String name) {
     return TimeoutWorkflow.builder().name(name);
+  }
+
+  /**
+   * Creates a builder for a {@link SagaWorkflow}, which implements the saga pattern with
+   * compensating actions for distributed transactions.
+   *
+   * @param name The unique name of the saga workflow.
+   * @return A new {@link SagaWorkflowBuilder} instance.
+   */
+  public static SagaWorkflowBuilder saga(String name) {
+    return SagaWorkflow.builder().name(name);
   }
 }

@@ -8,6 +8,7 @@
 - [Conditional Workflow](#conditional-workflow)
 - [Dynamic Branching Workflow](#dynamic-branching-workflow)
 - [Fallback Workflow](#fallback-workflow)
+- [Saga Workflow](#saga-workflow)
 - [Task Workflow](#task-workflow)
 - [Rate Limited Workflow](#rate-limited-workflow)
 - [Timeout Workflow](#timeout-workflow)
@@ -45,7 +46,7 @@ public class WorkflowResult {
 
 ## Workflow Types
 
-The framework provides nine core workflow types:
+The framework provides ten core workflow types:
 
 | Workflow              | Purpose              | Execution           | Use Case                  |
 |-----------------------|----------------------|---------------------|---------------------------|
@@ -54,6 +55,7 @@ The framework provides nine core workflow types:
 | **Conditional**       | Binary branching     | Based on predicate  | If-then-else logic        |
 | **Dynamic Branching** | Multi-way branching  | Based on selector   | Switch/case logic         |
 | **Fallback**          | Primary/secondary    | Fallback on failure | Error recovery            |
+| **Saga**              | Distributed txn      | With compensations  | Rollback on failure       |
 | **Task**              | Single task wrapper  | Task execution      | Wrap tasks as workflows   |
 | **Rate Limited**      | Throttled execution  | Rate controlled     | API rate limits           |
 | **Timeout**           | Time-bounded         | With timeout        | Time constraints          |
@@ -744,6 +746,219 @@ Workflow multiLevelFallback = FallbackWorkflow.builder()
 
 // Execution order: primary → secondary → tertiary
 ```
+
+## Saga Workflow
+
+Implements the [Saga pattern](https://microservices.io/patterns/data/saga.html) for managing distributed transactions with compensating actions. When any step fails, all previously completed steps are automatically rolled back in reverse order.
+
+### Features
+
+- **Compensating Actions**: Automatic rollback on failure
+- **Backward Recovery**: Compensations run in reverse order (last to first)
+- **Failure Context**: Access failure information during compensation
+- **Flexible Steps**: Support for tasks, workflows, or lambda functions
+- **Partial Compensation**: Steps without side effects don't need compensation
+- **Error Collection**: Aggregates both original failure and compensation errors
+
+### Builder API
+
+```
+SagaWorkflow.builder()
+    .name(String)                                     // Optional name
+    .step(SagaStep)                                   // Add saga step
+    .step(Task action, Task compensation)             // Convenience: tasks
+    .step(Workflow action, Workflow compensation)     // Convenience: workflows
+    .step(Task action)                                // Action only, no compensation
+    .step(Workflow action)                            // Action only, no compensation
+    .build()
+```
+
+### Basic Example
+
+```java
+SagaWorkflow orderSaga = SagaWorkflow.builder()
+    .name("OrderProcessingSaga")
+    .step(SagaStep.builder()
+        .name("ReserveInventory")
+        .action(new TaskWorkflow(new ReserveInventoryTask()))
+        .compensation(new TaskWorkflow(new ReleaseInventoryTask()))
+        .build())
+    .step(SagaStep.builder()
+        .name("ChargePayment")
+        .action(new TaskWorkflow(new ChargePaymentTask()))
+        .compensation(new TaskWorkflow(new RefundPaymentTask()))
+        .build())
+    .step(SagaStep.builder()
+        .name("ShipOrder")
+        .action(new TaskWorkflow(new ShipOrderTask()))
+        .compensation(new TaskWorkflow(new CancelShipmentTask()))
+        .build())
+    .build();
+
+public void example() {
+    WorkflowContext context = new WorkflowContext();
+    context.put("orderId", orderId);
+    WorkflowResult result = orderSaga.execute(context);
+}
+```
+
+### Using Convenience Methods
+
+```java
+// Using tasks directly
+SagaWorkflow saga = SagaWorkflow.builder()
+    .name("SimpleSaga")
+    .step(actionTask, compensationTask)  // Both as Tasks
+    .step(actionTask)                     // Action only, no compensation
+    .build();
+
+// Using workflows
+SagaWorkflow saga = SagaWorkflow.builder()
+    .name("WorkflowSaga")
+    .step(actionWorkflow, compensationWorkflow)
+    .step(readOnlyWorkflow)  // No compensation needed
+    .build();
+
+// Using lambda tasks
+SagaWorkflow saga = SagaWorkflow.builder()
+    .name("LambdaSaga")
+    .step(
+        ctx -> ctx.put("result", performWork()),
+        ctx -> ctx.remove("result")
+    )
+    .build();
+```
+
+### Real-World Example: E-Commerce Order
+
+```java
+SagaWorkflow orderSaga = SagaWorkflow.builder()
+    .name("OrderSaga")
+    
+    // Step 1: Validate order (no compensation needed)
+    .step(SagaStep.builder()
+        .name("ValidateOrder")
+        .action(ctx -> {
+            Order order = ctx.getTyped("order", Order.class);
+            if (order.getItems().isEmpty()) {
+                throw new TaskExecutionException("Order has no items");
+            }
+        })
+        .build())
+    
+    // Step 2: Reserve inventory
+    .step(SagaStep.builder()
+        .name("ReserveInventory")
+        .action(ctx -> {
+            Order order = ctx.getTyped("order", Order.class);
+            List<String> reservationIds = inventoryService.reserve(order.getItems());
+            ctx.put("reservationIds", reservationIds);
+        })
+        .compensation(ctx -> {
+            List<String> ids = ctx.getTyped("reservationIds", List.class);
+            if (ids != null) {
+                inventoryService.release(ids);
+            }
+        })
+        .build())
+    
+    // Step 3: Charge payment
+    .step(SagaStep.builder()
+        .name("ChargePayment")
+        .action(ctx -> {
+            Order order = ctx.getTyped("order", Order.class);
+            String transactionId = paymentService.charge(
+                order.getCustomerId(), 
+                order.getTotal()
+            );
+            ctx.put("paymentTransactionId", transactionId);
+        })
+        .compensation(ctx -> {
+            String txnId = ctx.get("paymentTransactionId");
+            if (txnId != null) {
+                paymentService.refund(txnId);
+            }
+        })
+        .build())
+    
+    .build();
+```
+
+### Failure Handling
+
+#### Accessing Failure Information
+
+```
+SagaStep.builder()
+    .name("DatabaseUpdate")
+    .action(updateWorkflow)
+    .compensation(ctx -> {
+        // Access the original failure cause
+        Throwable cause = ctx.get(SagaWorkflow.SAGA_FAILURE_CAUSE);
+        
+        // Access the name of the step that failed
+        String failedStep = ctx.get(SagaWorkflow.SAGA_FAILED_STEP);
+        
+        // Perform informed rollback
+        log.info("Rolling back due to failure in step: {}", failedStep);
+        performRollback(ctx, cause);
+    })
+    .build()
+```
+
+#### Handling Compensation Failures
+
+```java
+public void example() {
+    WorkflowResult result = saga.execute(context);
+
+    if (result.isFailure()) {
+        Throwable error = result.getError();
+
+        if (error instanceof SagaCompensationException sce) {
+            // Original failure
+            Throwable originalCause = sce.getCause();
+
+            // Compensation failures
+            List<Throwable> compensationErrors = sce.getCompensationErrors();
+
+            log.error("Saga failed at: {}", originalCause.getMessage());
+            log.error("Additionally, {} compensations failed:", compensationErrors.size());
+            for (Throwable compError : compensationErrors) {
+                log.error("  - {}", compError.getMessage());
+            }
+        }
+    }
+}
+```
+
+### Execution Semantics
+
+1. **Forward Execution**: Steps execute sequentially in the order they were added
+2. **Failure Detection**: If any step returns `FAILED` status or throws an exception, forward execution stops
+3. **Compensation Trigger**: On failure, all previously successful steps are compensated
+4. **Compensation Order**: Compensations run in reverse order (last success → first success)
+5. **Compensation Continuation**: If a compensation fails, remaining compensations still execute
+6. **Context Sharing**: All steps and compensations share the same `WorkflowContext`
+
+### Best Practices
+
+1. **Idempotent Compensations**: Design compensating actions to be idempotent
+2. **Store State for Rollback**: Save any IDs or references needed for compensation in the context
+3. **Null Checks in Compensation**: Always check for null before using context values
+4. **Log Compensation Actions**: Include detailed logging in compensations to aid debugging
+5. **Test Failure Scenarios**: Write tests that simulate failures at each step
+
+### When to Use Saga Pattern
+
+| Use Saga When                    | Use Alternative When              |
+|----------------------------------|-----------------------------------|
+| Multiple independent services    | Single service/database           |
+| Long-running transactions        | Short atomic transactions         |
+| Eventual consistency acceptable  | Strong consistency required       |
+| Compensating actions possible    | No way to undo operations         |
+
+For complete documentation and more examples, see [SAGA.md](SAGA.md).
 
 ## Task Workflow
 

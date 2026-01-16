@@ -54,7 +54,7 @@ import org.graalvm.polyglot.io.IOAccess;
  *
  * <pre>{@code
  * // script loaded from external source (eg: from a file scripts/discount.js)
- * // The 'context' object is injected automatically into the global scope
+ * // The 'ctx' object is injected automatically into the global scope
  * var amount = ctx.get("orderTotal");
  * if (amount > 1000) {
  *     ctx.put("discountCode", "VIP_PROMO");
@@ -108,8 +108,7 @@ public class JavascriptWorkflow extends AbstractWorkflow {
    * <ol>
    *   <li>Creates a lightweight, isolated graalvm polygot {@link Context}.
    *   <li>Fetches script content from the {@link ScriptProvider}.
-   *   <li>Injects the {@link WorkflowContext} into the JS global scope under the name {@code
-   *       context}.
+   *   <li>Injects the {@link WorkflowContext} into the JS global scope under the name {@code ctx}.
    *   <li>Evaluates the script and returns a success result unless an exception occurs.
    * </ol>
    *

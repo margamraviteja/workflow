@@ -44,6 +44,9 @@ public static DynamicBranchingWorkflowBuilder dynamic(String name);
 // Fallback workflow builder
 public static FallbackWorkflowBuilder fallback(String name);
 
+// Saga workflow builder
+public static SagaWorkflowBuilder saga(String name);
+
 // Rate-limited workflow builder
 public static RateLimitedWorkflowBuilder rateLimited(String name);
 
@@ -88,6 +91,14 @@ public class WorkflowFactory {
             .condition(ctx -> ctx.getTyped("isAdmin", Boolean.class))
             .whenTrue(adminWorkflow)
             .whenFalse(userWorkflow)
+            .build();
+    }
+    
+    public Workflow createSagaWorkflow() {
+        return saga("OrderSaga")
+            .step(reserveInventoryTask, releaseInventoryTask)
+            .step(chargePaymentTask, refundPaymentTask)
+            .step(shipOrderTask, cancelShipmentTask)
             .build();
     }
 }

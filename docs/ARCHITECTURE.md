@@ -45,13 +45,17 @@ The Workflow Engine is designed as a flexible, extensible orchestration framewor
 │  │   Workflow   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   Dynamic    │  │   Fallback   │  │      Task            │  │
+│  │   Dynamic    │  │   Fallback   │  │      Saga            │  │
 │  │  Branching   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Rate Limited │  │   Timeout    │  │    Javascript        │  │
+│  │     Task     │  │ Rate Limited │  │     Timeout          │  │
 │  │   Workflow   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────┐                                              │
+│  │ Javascript   │                                              │
+│  │   Workflow   │                                              │
+│  └──────────────┘                                              │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -169,6 +173,7 @@ else:
                │         ├── ConditionalWorkflow
                │         ├── DynamicBranchingWorkflow
                │         ├── FallbackWorkflow
+               │         ├── SagaWorkflow
                │         ├── TaskWorkflow
                │         ├── RateLimitedWorkflow
                │         └── TimeoutWorkflow
