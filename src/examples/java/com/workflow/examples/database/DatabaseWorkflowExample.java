@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import javax.sql.DataSource;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.h2.jdbcx.JdbcDataSource;
 
@@ -43,6 +44,7 @@ import org.h2.jdbcx.JdbcDataSource;
  * }</pre>
  */
 @Slf4j
+@UtilityClass
 public class DatabaseWorkflowExample {
 
   /**
@@ -211,7 +213,7 @@ public class DatabaseWorkflowExample {
   }
 
   /** Main method to run the example. */
-  public static void main(String[] args) {
+  static void main() {
     try {
       // Create H2 in-memory data source
       JdbcDataSource dataSource = new JdbcDataSource();

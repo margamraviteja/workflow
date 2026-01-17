@@ -2,10 +2,10 @@ package com.workflow.helper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import java.io.IOException;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 
 /** Comprehensive test suite for JsonUtils with edge cases and error handling. */
 class JsonUtilsEnhancedTest {
@@ -13,7 +13,7 @@ class JsonUtilsEnhancedTest {
   // ==== fromJson Tests ====
 
   @Test
-  void fromJson_validJson_deserializesCorrectly() throws IOException {
+  void fromJson_validJson_deserializesCorrectly() {
     String json = "{\"name\":\"John\",\"age\":30}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -24,12 +24,12 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_null_returnsNull() throws IOException {
+  void fromJson_null_returnsNull() {
     assertNull(JsonUtils.fromJson(null, String.class));
   }
 
   @Test
-  void fromJson_emptyString_returnsNull() throws IOException {
+  void fromJson_emptyString_returnsNull() {
     Object result = JsonUtils.fromJson("", String.class);
 
     assertNull(result);
@@ -37,25 +37,25 @@ class JsonUtilsEnhancedTest {
 
   @Test
   void fromJson_whitespaceOnly_throwsIOException() {
-    assertThrows(IOException.class, () -> JsonUtils.fromJson("   ", String.class));
+    assertThrows(JacksonException.class, () -> JsonUtils.fromJson("   ", String.class));
   }
 
   @Test
   void fromJson_invalidJson_throwsIOException() {
     String invalidJson = "{invalid json}";
 
-    assertThrows(IOException.class, () -> JsonUtils.fromJson(invalidJson, Map.class));
+    assertThrows(JacksonException.class, () -> JsonUtils.fromJson(invalidJson, Map.class));
   }
 
   @Test
   void fromJson_malformedJson_throwsIOException() {
     String malformedJson = "{\"name\":\"John\",\"age\":}";
 
-    assertThrows(IOException.class, () -> JsonUtils.fromJson(malformedJson, Map.class));
+    assertThrows(JacksonException.class, () -> JsonUtils.fromJson(malformedJson, Map.class));
   }
 
   @Test
-  void fromJson_unknownProperties_doesNotFail() throws IOException {
+  void fromJson_unknownProperties_doesNotFail() {
     String json = "{\"name\":\"John\",\"age\":30,\"extra\":\"ignored\"}";
 
     TestPojo result = JsonUtils.fromJson(json, TestPojo.class);
@@ -67,7 +67,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_missingProperties_setsToNull() throws IOException {
+  void fromJson_missingProperties_setsToNull() {
     String json = "{\"name\":\"John\"}";
 
     TestPojo result = JsonUtils.fromJson(json, TestPojo.class);
@@ -78,7 +78,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_nestedObjects_deserializesCorrectly() throws IOException {
+  void fromJson_nestedObjects_deserializesCorrectly() {
     String json = "{\"user\":{\"name\":\"John\",\"age\":30}}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -91,7 +91,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_array_deserializesCorrectly() throws IOException {
+  void fromJson_array_deserializesCorrectly() {
     String json = "[1,2,3,4,5]";
 
     List<Integer> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -103,7 +103,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_emptyArray_deserializesCorrectly() throws IOException {
+  void fromJson_emptyArray_deserializesCorrectly() {
     String json = "[]";
 
     List<?> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -113,7 +113,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_emptyObject_deserializesCorrectly() throws IOException {
+  void fromJson_emptyObject_deserializesCorrectly() {
     String json = "{}";
 
     Map<?, ?> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -123,7 +123,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_nullValue_deserializesCorrectly() throws IOException {
+  void fromJson_nullValue_deserializesCorrectly() {
     String json = "{\"name\":null}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -134,7 +134,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_booleanValues_deserializesCorrectly() throws IOException {
+  void fromJson_booleanValues_deserializesCorrectly() {
     String json = "{\"active\":true,\"deleted\":false}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -144,7 +144,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_numberTypes_deserializesCorrectly() throws IOException {
+  void fromJson_numberTypes_deserializesCorrectly() {
     String json = "{\"intVal\":42,\"doubleVal\":3.14,\"longVal\":9999999999}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -155,7 +155,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_specialCharacters_deserializesCorrectly() throws IOException {
+  void fromJson_specialCharacters_deserializesCorrectly() {
     String json = "{\"text\":\"Hello\\nWorld\\t!\"}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -164,7 +164,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_unicodeCharacters_deserializesCorrectly() throws IOException {
+  void fromJson_unicodeCharacters_deserializesCorrectly() {
     String json = "{\"emoji\":\"😊\",\"chinese\":\"你好\"}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -174,7 +174,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void fromJson_escapedQuotes_deserializesCorrectly() throws IOException {
+  void fromJson_escapedQuotes_deserializesCorrectly() {
     String json = "{\"text\":\"He said \\\"Hello\\\"\"}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});
@@ -185,12 +185,12 @@ class JsonUtilsEnhancedTest {
   // ==== toJson Tests ====
 
   @Test
-  void toJson_null_returnsNull() throws IOException {
+  void toJson_null_returnsNull() {
     assertNull(JsonUtils.toJson(null));
   }
 
   @Test
-  void toJson_simpleObject_serializesCorrectly() throws IOException {
+  void toJson_simpleObject_serializesCorrectly() {
     TestPojo pojo = new TestPojo();
     pojo.name = "John";
     pojo.age = 30;
@@ -203,7 +203,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_map_serializesCorrectly() throws IOException {
+  void toJson_map_serializesCorrectly() {
     Map<String, Object> map = new HashMap<>();
     map.put("key1", "value1");
     map.put("key2", 42);
@@ -216,7 +216,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_list_serializesCorrectly() throws IOException {
+  void toJson_list_serializesCorrectly() {
     List<Integer> list = Arrays.asList(1, 2, 3, 4, 5);
 
     String json = JsonUtils.toJson(list);
@@ -225,7 +225,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_emptyList_serializesCorrectly() throws IOException {
+  void toJson_emptyList_serializesCorrectly() {
     List<?> list = Collections.emptyList();
 
     String json = JsonUtils.toJson(list);
@@ -234,7 +234,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_emptyMap_serializesCorrectly() throws IOException {
+  void toJson_emptyMap_serializesCorrectly() {
     Map<?, ?> map = Collections.emptyMap();
 
     String json = JsonUtils.toJson(map);
@@ -243,7 +243,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_nestedObjects_serializesCorrectly() throws IOException {
+  void toJson_nestedObjects_serializesCorrectly() {
     Map<String, Object> outer = new HashMap<>();
     Map<String, Object> inner = new HashMap<>();
     inner.put("name", "John");
@@ -257,7 +257,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_nullField_serializesAsNull() throws IOException {
+  void toJson_nullField_serializesAsNull() {
     Map<String, Object> map = new HashMap<>();
     map.put("key", null);
 
@@ -267,7 +267,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_booleanValues_serializesCorrectly() throws IOException {
+  void toJson_booleanValues_serializesCorrectly() {
     Map<String, Boolean> map = new HashMap<>();
     map.put("active", true);
     map.put("deleted", false);
@@ -279,7 +279,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_specialCharacters_escapesCorrectly() throws IOException {
+  void toJson_specialCharacters_escapesCorrectly() {
     Map<String, String> map = new HashMap<>();
     map.put("text", "Hello\nWorld\t!");
 
@@ -290,7 +290,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_unicodeCharacters_serializesCorrectly() throws IOException {
+  void toJson_unicodeCharacters_serializesCorrectly() {
     Map<String, String> map = new HashMap<>();
     map.put("emoji", "😊");
     map.put("chinese", "你好");
@@ -302,7 +302,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_quotes_escapesCorrectly() throws IOException {
+  void toJson_quotes_escapesCorrectly() {
     Map<String, String> map = new HashMap<>();
     map.put("text", "He said \"Hello\"");
 
@@ -314,7 +314,7 @@ class JsonUtilsEnhancedTest {
   // ==== Round-trip Tests ====
 
   @Test
-  void roundTrip_simpleObject_preservesData() throws IOException {
+  void roundTrip_simpleObject_preservesData() {
     TestPojo original = new TestPojo();
     original.name = "Alice";
     original.age = 25;
@@ -327,7 +327,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void roundTrip_map_preservesData() throws IOException {
+  void roundTrip_map_preservesData() {
     Map<String, Object> original = new HashMap<>();
     original.put("string", "value");
     original.put("number", 42);
@@ -342,7 +342,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void roundTrip_list_preservesData() throws IOException {
+  void roundTrip_list_preservesData() {
     List<String> original = Arrays.asList("a", "b", "c");
 
     String json = JsonUtils.toJson(original);
@@ -352,7 +352,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void roundTrip_complexNested_preservesStructure() throws IOException {
+  void roundTrip_complexNested_preservesStructure() {
     Map<String, Object> original = new HashMap<>();
     original.put("users", Arrays.asList("Alice", "Bob"));
     Map<String, Integer> scores = new HashMap<>();
@@ -370,7 +370,7 @@ class JsonUtilsEnhancedTest {
   // ==== Edge Cases ====
 
   @Test
-  void fromJson_veryLargeJson_works() throws IOException {
+  void fromJson_veryLargeJson_works() {
     StringBuilder sb = new StringBuilder("{");
     for (int i = 0; i < 1000; i++) {
       if (i > 0) sb.append(",");
@@ -384,7 +384,7 @@ class JsonUtilsEnhancedTest {
   }
 
   @Test
-  void toJson_veryLargeObject_works() throws IOException {
+  void toJson_veryLargeObject_works() {
     Map<String, String> large = new HashMap<>();
     for (int i = 0; i < 1000; i++) {
       large.put("key" + i, "value" + i);
@@ -398,7 +398,7 @@ class JsonUtilsEnhancedTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void fromJson_deeplyNested_works() throws IOException {
+  void fromJson_deeplyNested_works() {
     String json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":\"value\"}}}}}";
 
     Map<String, Object> result = JsonUtils.fromJson(json, new TypeReference<>() {});

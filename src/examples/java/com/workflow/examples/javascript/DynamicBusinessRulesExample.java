@@ -37,7 +37,7 @@ public class DynamicBusinessRulesExample {
 
   public static final String BASE_PRICE = "basePrice";
 
-  public static void main(String[] args) throws IOException {
+  static void main() throws IOException {
     log.info("=== Dynamic Business Rules Example ===\n");
 
     // Create temp directory for scripts

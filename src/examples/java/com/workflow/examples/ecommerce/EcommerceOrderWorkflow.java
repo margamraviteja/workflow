@@ -183,7 +183,7 @@ public class EcommerceOrderWorkflow {
         .build();
   }
 
-  public static void main(String[] args) {
+  static void main() {
     EcommerceOrderWorkflow example = new EcommerceOrderWorkflow();
     Workflow workflow = example.buildWorkflow();
 

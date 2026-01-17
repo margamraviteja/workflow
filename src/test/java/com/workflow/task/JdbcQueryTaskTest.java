@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
 import java.sql.Connection;
@@ -18,6 +17,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.type.TypeReference;
 
 class JdbcQueryTaskTest {
 

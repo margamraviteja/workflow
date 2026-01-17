@@ -405,7 +405,7 @@ public class DataMigrationExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     executeMigration();
   }
 }

@@ -2,7 +2,6 @@ package com.workflow.task;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.context.WorkflowContext;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -15,6 +14,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.type.TypeReference;
 
 class JdbcQueryTaskIntegrationTest {
 

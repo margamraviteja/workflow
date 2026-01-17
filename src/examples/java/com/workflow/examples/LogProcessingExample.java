@@ -414,7 +414,7 @@ public class LogProcessingExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     processLogs();
   }
 }

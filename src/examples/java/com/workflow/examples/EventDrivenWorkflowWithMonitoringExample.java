@@ -225,7 +225,7 @@ public class EventDrivenWorkflowWithMonitoringExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Event-Driven Workflow with Monitoring Example ===\n");
 
     MetricsCollector metricsCollector = new MetricsCollector();

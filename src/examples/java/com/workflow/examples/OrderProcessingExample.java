@@ -291,7 +291,7 @@ public class OrderProcessingExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     processOrder();
   }
 }

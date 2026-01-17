@@ -44,7 +44,7 @@ public class RealTimeDataProcessingExample {
   public static final String LATENCY = "latency";
   public static final String STATUS = "status";
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Real-Time Data Processing Examples ===\n");
 
     anomalyDetection();

@@ -4,6 +4,7 @@ import com.workflow.*;
 import com.workflow.context.WorkflowContext;
 import com.workflow.task.Task;
 import java.util.*;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -44,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
  * @see SequentialWorkflow
  */
 @Slf4j
+@UtilityClass
 public class SagaWorkflowExample {
 
   public static final String TOTAL_AMOUNT = "totalAmount";
@@ -119,12 +121,8 @@ public class SagaWorkflowExample {
         .build();
   }
 
-  /**
-   * Example usage demonstrating saga execution.
-   *
-   * @param args command line arguments
-   */
-  public static void main(String[] args) {
+  /** Example usage demonstrating saga execution. */
+  static void main() {
     WorkflowContext context = new WorkflowContext();
     context.put("orderId", "ORD-12345");
     context.put("customerId", "CUST-789");

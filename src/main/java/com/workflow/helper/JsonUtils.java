@@ -1,10 +1,10 @@
 package com.workflow.helper;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import java.io.IOException;
 import lombok.experimental.UtilityClass;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Utility class for JSON serialization and deserialization using Jackson.
@@ -70,7 +70,7 @@ import lombok.experimental.UtilityClass;
  * <p><b>Unknown Properties Handling:</b> The configured Jackson mapper does not fail when JSON
  * contains unknown properties. This allows parsing of new API versions that add fields.
  *
- * @see com.fasterxml.jackson.databind.json.JsonMapper
+ * @see JsonMapper
  */
 @UtilityClass
 public final class JsonUtils {
@@ -79,17 +79,17 @@ public final class JsonUtils {
           .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
           .build();
 
-  public static <T> T fromJson(String json, Class<T> clazz) throws IOException {
+  public static <T> T fromJson(String json, Class<T> clazz) throws JacksonException {
     if (json == null || json.isEmpty()) return null;
     return MAPPER.readValue(json, clazz);
   }
 
-  public static <T> T fromJson(String json, TypeReference<T> typeRef) throws IOException {
+  public static <T> T fromJson(String json, TypeReference<T> typeRef) throws JacksonException {
     if (json == null || json.isEmpty()) return null;
     return MAPPER.readValue(json, typeRef);
   }
 
-  public static String toJson(Object obj) throws IOException {
+  public static String toJson(Object obj) throws JacksonException {
     return obj == null ? null : MAPPER.writeValueAsString(obj);
   }
 }

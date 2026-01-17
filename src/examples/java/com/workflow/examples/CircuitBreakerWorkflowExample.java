@@ -96,7 +96,7 @@ public class CircuitBreakerWorkflowExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Circuit Breaker Pattern Example ===");
 
     // Simulate an unreliable external service

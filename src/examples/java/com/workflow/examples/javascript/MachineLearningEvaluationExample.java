@@ -42,7 +42,7 @@ public class MachineLearningEvaluationExample {
   public static final String FINANCIAL = "financial";
   public static final String EMPLOYMENT = "employment";
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Machine Learning Model Evaluation Examples ===\n");
 
     binaryClassificationEvaluation();

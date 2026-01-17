@@ -59,7 +59,7 @@ public class ESMModuleExample {
 
   public static final String RESULT = "result";
 
-  public static void main(String[] args) throws IOException {
+  static void main() throws IOException {
     // Create temporary directory for module examples
     Path modulesDir = Files.createTempDirectory("workflow-modules-");
 

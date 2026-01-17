@@ -465,7 +465,7 @@ public class DocumentProcessingExample {
     }
   }
 
-  public static void main(String[] args) throws Exception {
+  static void main() throws Exception {
     processDocument();
   }
 }

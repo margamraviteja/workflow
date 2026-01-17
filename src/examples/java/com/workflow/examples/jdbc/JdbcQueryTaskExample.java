@@ -370,7 +370,7 @@ public class JdbcQueryTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcQueryTaskExample example = new JdbcQueryTaskExample();
 
     example.example1SimpleQuery();

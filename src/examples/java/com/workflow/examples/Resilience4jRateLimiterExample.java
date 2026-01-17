@@ -18,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -35,9 +36,10 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
+@UtilityClass
 public class Resilience4jRateLimiterExample {
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Resilience4j Rate Limiter Examples ===\n");
 
     // Example 1: Basic Resilience4j Rate Limiting

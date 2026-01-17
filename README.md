@@ -989,7 +989,7 @@ Thread-safe, type-safe context for data flow:
 ```java
 import java.util.List;
 import com.workflow.context.*;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 
 public class WorkflowDataHandler {
     // Constants (TypedKeys) can be declared at the class level

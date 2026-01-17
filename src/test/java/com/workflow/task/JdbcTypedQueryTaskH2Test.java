@@ -2,12 +2,12 @@ package com.workflow.task;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.context.WorkflowContext;
 import java.sql.*;
 import java.util.*;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.*;
+import tools.jackson.core.type.TypeReference;
 
 class JdbcTypedQueryTaskH2Test {
 

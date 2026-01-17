@@ -13,6 +13,7 @@ import com.workflow.task.FileWriteTask;
 import com.workflow.task.Task;
 import java.nio.file.Path;
 import java.time.Duration;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
  * dependencies.
  */
 @Slf4j
+@UtilityClass
 public class PureJavaAnnotationExample {
 
   public static final String FILE_CONTENT = "file.content";
@@ -139,7 +141,7 @@ public class PureJavaAnnotationExample {
   }
 
   /** Main method demonstrating usage of the pure Java annotation processor. */
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Pure Java Annotation-Based Workflow Example ===\n");
 
     // Create the annotation processor

@@ -528,7 +528,7 @@ public class JdbcBatchUpdateTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcBatchUpdateTaskExample example = new JdbcBatchUpdateTaskExample();
 
     example.example1SimpleBatchInsert();

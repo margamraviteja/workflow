@@ -344,7 +344,7 @@ public class ApiOrchestrationExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     orchestrateApis();
   }
 }

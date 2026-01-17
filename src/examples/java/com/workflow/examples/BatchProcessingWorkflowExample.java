@@ -153,7 +153,7 @@ public class BatchProcessingWorkflowExample {
     }
   }
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Batch Processing Workflow Example ===\n");
 
     int totalRecords = 1000;

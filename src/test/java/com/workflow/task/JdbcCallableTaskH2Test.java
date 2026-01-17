@@ -2,7 +2,6 @@ package com.workflow.task;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.context.WorkflowContext;
 import java.sql.*;
 import java.util.HashMap;
@@ -11,6 +10,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.*;
+import tools.jackson.core.type.TypeReference;
 
 @DisplayName("JdbcCallableTask - H2 Integration Tests")
 class JdbcCallableTaskH2Test {

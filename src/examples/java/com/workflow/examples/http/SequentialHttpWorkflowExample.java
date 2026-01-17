@@ -1,6 +1,5 @@
 package com.workflow.examples.http;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.SequentialWorkflow;
 import com.workflow.WorkflowResult;
 import com.workflow.WorkflowStatus;
@@ -13,7 +12,6 @@ import com.workflow.policy.TimeoutPolicy;
 import com.workflow.task.GetHttpTask;
 import com.workflow.task.PostHttpTask;
 import com.workflow.task.TaskDescriptor;
-import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -23,6 +21,8 @@ import java.util.function.Function;
 import lombok.Data;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 
 /**
  * Sequential Workflow Example using HTTP Tasks with JSONPlaceholder API.
@@ -115,7 +115,7 @@ public class SequentialHttpWorkflowExample {
       }
       try {
         return JsonUtils.fromJson(body, new TypeReference<>() {});
-      } catch (IOException e) {
+      } catch (JacksonException e) {
         log.error("Failed to parse users list: {}", e.getMessage());
         throw new JsonProcessingException("Failed to parse users response", e);
       }
@@ -131,7 +131,7 @@ public class SequentialHttpWorkflowExample {
       }
       try {
         return JsonUtils.fromJson(body, new TypeReference<>() {});
-      } catch (IOException e) {
+      } catch (JacksonException e) {
         log.error("Failed to parse posts list: {}", e.getMessage());
         throw new JsonProcessingException("Failed to parse posts response", e);
       }
@@ -150,7 +150,7 @@ public class SequentialHttpWorkflowExample {
       }
       try {
         return JsonUtils.fromJson(body, new TypeReference<>() {});
-      } catch (IOException e) {
+      } catch (JacksonException e) {
         log.error("Failed to parse response as map: {}", e.getMessage());
         throw new JsonProcessingException("Failed to parse response as map", e);
       }
@@ -281,7 +281,7 @@ public class SequentialHttpWorkflowExample {
                 response -> {
                   try {
                     return JsonUtils.fromJson(response.body(), new TypeReference<>() {});
-                  } catch (IOException e) {
+                  } catch (JacksonException e) {
                     throw new JsonProcessingException("Failed to parse users", e);
                   }
                 })
@@ -334,7 +334,7 @@ public class SequentialHttpWorkflowExample {
                                 "This is a post created by SequentialHttpWorkflowExample demonstrating HTTP task capabilities.",
                                 "userId",
                                 userId));
-                  } catch (IOException e) {
+                  } catch (JacksonException e) {
                     throw new JsonProcessingException("Failed to serialize post body", e);
                   }
 
@@ -430,7 +430,7 @@ public class SequentialHttpWorkflowExample {
                         response -> {
                           try {
                             return JsonUtils.fromJson(response.body(), new TypeReference<>() {});
-                          } catch (IOException e) {
+                          } catch (JacksonException e) {
                             throw new JsonProcessingException("Failed to parse comments", e);
                           }
                         })
@@ -490,7 +490,7 @@ public class SequentialHttpWorkflowExample {
             return allTodos.stream()
                 .filter(todo -> Boolean.TRUE.equals(todo.get("completed")))
                 .toList();
-          } catch (IOException e) {
+          } catch (JacksonException e) {
             throw new JsonProcessingException("Failed to parse todos", e);
           }
         };
@@ -503,7 +503,7 @@ public class SequentialHttpWorkflowExample {
             return allTodos.stream()
                 .filter(todo -> Boolean.FALSE.equals(todo.get("completed")))
                 .toList();
-          } catch (IOException e) {
+          } catch (JacksonException e) {
             throw new JsonProcessingException("Failed to parse todos", e);
           }
         };

@@ -550,7 +550,7 @@ public class JdbcCallableTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcCallableTaskExample example = new JdbcCallableTaskExample();
 
     example.example1SimpleProcedureWithInParams();

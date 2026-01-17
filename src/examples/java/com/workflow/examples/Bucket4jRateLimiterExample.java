@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -24,9 +25,10 @@ import lombok.extern.slf4j.Slf4j;
  * execution rates.
  */
 @Slf4j
+@UtilityClass
 public class Bucket4jRateLimiterExample {
 
-  public static void main(String[] args) throws Exception {
+  static void main() throws Exception {
     log.info("=== Bucket4j Rate Limiter Examples ===\n");
 
     // Example 1: Basic rate limiting

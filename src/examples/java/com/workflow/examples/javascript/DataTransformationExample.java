@@ -34,7 +34,7 @@ public class DataTransformationExample {
   public static final String PRICE = "price";
   public static final String INVENTORY = "inventory";
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Data Transformation Examples ===\n");
 
     simpleTransformation();

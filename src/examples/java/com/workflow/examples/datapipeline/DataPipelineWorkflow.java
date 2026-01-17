@@ -225,7 +225,7 @@ public class DataPipelineWorkflow {
         .build();
   }
 
-  public static void main(String[] args) {
+  static void main() {
     DataPipelineWorkflow pipeline = new DataPipelineWorkflow();
     Workflow workflow = pipeline.buildWorkflow();
 

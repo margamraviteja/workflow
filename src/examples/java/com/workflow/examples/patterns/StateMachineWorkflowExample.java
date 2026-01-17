@@ -3,6 +3,7 @@ package com.workflow.examples.patterns;
 import com.workflow.*;
 import com.workflow.context.WorkflowContext;
 import java.util.*;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -23,12 +24,13 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
+@UtilityClass
 public class StateMachineWorkflowExample {
 
   private static final Random random = new Random();
   public static final String STATE = "state";
 
-  public static void main(String[] args) {
+  static void main() {
     WorkflowContext context = new WorkflowContext();
     context.put("orderId", "ORD-456");
     context.put(STATE, "PENDING");

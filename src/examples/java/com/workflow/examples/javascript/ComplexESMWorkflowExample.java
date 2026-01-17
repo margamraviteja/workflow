@@ -59,7 +59,7 @@ public class ComplexESMWorkflowExample {
   public static final String AMOUNT = "amount";
   public static final String TIMESTAMP = "timestamp";
 
-  public static void main(String[] args) throws IOException {
+  static void main() throws IOException {
     Path workDir = Files.createTempDirectory("complex-esm-");
 
     try {

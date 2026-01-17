@@ -1,11 +1,12 @@
 package com.workflow.examples.patterns;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.*;
 import com.workflow.context.WorkflowContext;
 import com.workflow.task.Task;
 import java.util.*;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.core.type.TypeReference;
 
 /**
  * Demonstrates the Fan-Out/Fan-In pattern for parallel processing with aggregation.
@@ -31,11 +32,12 @@ import lombok.extern.slf4j.Slf4j;
  * </pre>
  */
 @Slf4j
+@UtilityClass
 public class FanOutFanInWorkflowExample {
 
   public static final String RESULTS = "results";
 
-  public static void main(String[] args) {
+  static void main() {
     // Example 1: Parallel data processing
     log.info("=== Example 1: Batch Image Processing ===\n");
     runImageProcessingExample();

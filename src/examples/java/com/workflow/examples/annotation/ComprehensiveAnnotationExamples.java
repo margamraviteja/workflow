@@ -341,7 +341,7 @@ public class ComprehensiveAnnotationExamples {
   // Main Method - Demonstrates all examples
   // ============================================================================
 
-  public static void main(String[] args) {
+  static void main() {
     JavaAnnotationWorkflowProcessor processor = new JavaAnnotationWorkflowProcessor();
 
     log.info("\n{}", "=".repeat(80));

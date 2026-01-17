@@ -7,6 +7,7 @@ import com.workflow.annotation.WorkflowRef;
 import com.workflow.annotation.java.JavaAnnotationWorkflowProcessor;
 import com.workflow.context.WorkflowContext;
 import com.workflow.task.Task;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,12 +27,13 @@ import lombok.extern.slf4j.Slf4j;
  * workflows while maintaining clean separation of concerns.
  */
 @Slf4j
+@UtilityClass
 public class CompositeWorkflowExample {
 
   public static final String INPUT_DATA = "input.data";
 
   /** Demonstration of building and executing a composite workflow. */
-  public static void main(String[] args) {
+  static void main() {
     log.info("Starting Composite Workflow Example");
 
     JavaAnnotationWorkflowProcessor processor = new JavaAnnotationWorkflowProcessor();
@@ -155,7 +157,6 @@ public class CompositeWorkflowExample {
    */
   @WorkflowAnnotation(
       name = "DataProcessingPipeline",
-      parallel = false,
       description =
           "Complete data processing pipeline combining validation, transformation, and output")
   public static class DataProcessingPipelineWorkflow {
@@ -183,7 +184,6 @@ public class CompositeWorkflowExample {
    */
   @WorkflowAnnotation(
       name = "EnhancedDataProcessingPipeline",
-      parallel = false,
       description = "Enhanced data processing pipeline with audit logging")
   public static class EnhancedDataProcessingPipelineWorkflow {
 

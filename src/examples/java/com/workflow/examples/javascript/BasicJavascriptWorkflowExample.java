@@ -26,7 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class BasicJavascriptWorkflowExample {
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Basic Javascript Workflow Examples ===\n");
 
     simpleCalculation();

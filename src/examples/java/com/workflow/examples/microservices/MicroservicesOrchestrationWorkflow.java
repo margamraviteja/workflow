@@ -247,7 +247,7 @@ public class MicroservicesOrchestrationWorkflow {
     return new TaskWorkflow(descriptor);
   }
 
-  public static void main(String[] args) {
+  static void main() {
     MicroservicesOrchestrationWorkflow orchestration = new MicroservicesOrchestrationWorkflow();
     Workflow workflow = orchestration.buildWorkflow();
 

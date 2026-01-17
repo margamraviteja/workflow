@@ -33,7 +33,7 @@ public class WebhookProcessingExample {
 
   public static final String PAYLOAD = "payload";
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Webhook Processing Examples ===\n");
 
     githubWebhookProcessing();

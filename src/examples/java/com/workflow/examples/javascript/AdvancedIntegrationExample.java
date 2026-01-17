@@ -41,7 +41,7 @@ public class AdvancedIntegrationExample {
   public static final String FEATURE_ENABLED = "featureEnabled";
   public static final String PROCESSED_BY = "processedBy";
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Advanced Javascript Workflow Integration Examples ===\n");
 
     conditionalWithJavascript();

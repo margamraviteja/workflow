@@ -1,7 +1,7 @@
 package com.workflow.context;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.Objects;
+import tools.jackson.core.type.TypeReference;
 
 public final class ScopedWorkflowContext extends WorkflowContext {
   private final WorkflowContext delegate;

@@ -471,7 +471,7 @@ public class JdbcUpdateTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcUpdateTaskExample example = new JdbcUpdateTaskExample();
 
     example.example1SimpleInsert();

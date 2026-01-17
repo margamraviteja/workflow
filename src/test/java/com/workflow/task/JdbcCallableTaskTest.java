@@ -3,7 +3,6 @@ package com.workflow.task;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
 import java.sql.*;
@@ -16,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.core.type.TypeReference;
 
 @ExtendWith(MockitoExtension.class)
 class JdbcCallableTaskTest {

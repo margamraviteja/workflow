@@ -3,10 +3,10 @@ package com.workflow.helper;
 import com.workflow.exception.HttpResponseProcessingException;
 import com.workflow.exception.JsonProcessingException;
 import com.workflow.exception.TaskExecutionException;
-import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.util.function.Function;
 import lombok.experimental.UtilityClass;
+import tools.jackson.core.JacksonException;
 
 /**
  * Common response mappers for HTTP tasks. Provides strict typed mapper that checks for HTTP errors
@@ -35,7 +35,7 @@ public final class ResponseMappers {
       }
       try {
         return JsonUtils.fromJson(body, responseType);
-      } catch (IOException e) {
+      } catch (JacksonException e) {
         throw new JsonProcessingException(
             "Failed to deserialize response to " + responseType.getName(), e);
       }
@@ -56,7 +56,7 @@ public final class ResponseMappers {
       if (body == null || body.isBlank()) return null;
       try {
         return JsonUtils.fromJson(body, responseType);
-      } catch (IOException e) {
+      } catch (JacksonException e) {
         throw new JsonProcessingException(
             "Failed to deserialize response to " + responseType.getName(), e);
       }

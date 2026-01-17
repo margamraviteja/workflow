@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -38,9 +39,10 @@ import lombok.extern.slf4j.Slf4j;
  * Resilience4jRateLimiterExample}.
  */
 @Slf4j
+@UtilityClass
 public class RateLimitingExample {
 
-  public static void main(String[] args) {
+  static void main() {
     log.info("=== Rate Limiting Examples ===\n");
 
     // Example 1: Fixed Window Rate Limiting

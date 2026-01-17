@@ -1,13 +1,13 @@
 package com.workflow.context;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.workflow.listener.WorkflowListeners;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import lombok.Getter;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.type.TypeFactory;
 
 /**
  * Thread-safe, key-value store that acts as shared state across workflows and tasks.
@@ -389,7 +389,8 @@ public class WorkflowContext {
     if (value == null) return null;
 
     // Runtime type check using raw class from TypeReference
-    Class<?> rawType = TypeFactory.defaultInstance().constructType(typeRef.getType()).getRawClass();
+    Class<?> rawType =
+        TypeFactory.createDefaultInstance().constructType(typeRef.getType()).getRawClass();
     if (rawType != null && !rawType.isInstance(value)) {
       throw new IllegalStateException(
           "Expected key '"

@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * <pre>{@code
  * @SpringBootApplication
  * public class WorkflowApplication {
- *   public static void main(String[] args) {
+ *   static void main(String[] args) {
  *     SpringApplication.run(WorkflowApplication.class, args);
  *   }
  *

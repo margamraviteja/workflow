@@ -618,7 +618,7 @@ public class JdbcTypedQueryTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcTypedQueryTaskExample example = new JdbcTypedQueryTaskExample();
 
     example.example1SimpleRecordMapping();

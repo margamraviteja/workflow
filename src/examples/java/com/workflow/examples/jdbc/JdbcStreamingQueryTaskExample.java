@@ -513,7 +513,7 @@ public class JdbcStreamingQueryTaskExample {
   }
 
   /** Main method to run all examples. */
-  public static void main(String[] args) throws SQLException {
+  static void main() throws SQLException {
     JdbcStreamingQueryTaskExample example = new JdbcStreamingQueryTaskExample();
 
     example.example1SimpleStreaming();

@@ -14,6 +14,7 @@ import com.workflow.exception.TaskExecutionException;
 import com.workflow.registry.WorkflowRegistry;
 import com.workflow.task.Task;
 import javax.sql.DataSource;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
+@UtilityClass
 public class ParallelWorkflowOptionsExample {
 
   /**
@@ -441,7 +443,7 @@ public class ParallelWorkflowOptionsExample {
         "Note: Data fetch required all services (fail-fast), but post-processing continued despite analytics failure\n");
   }
 
-  public static void main(String[] args) {
+  static void main() {
     try {
       example1FailFastForCriticalServices();
       example2CollectAllResultsWithoutFailFast();
