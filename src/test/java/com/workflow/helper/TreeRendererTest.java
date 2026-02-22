@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.workflow.*;
 import com.workflow.ratelimit.FixedWindowRateLimiter;
+import com.workflow.saga.SagaStep;
+import com.workflow.script.ScriptProvider;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -1253,6 +1255,533 @@ class TreeRendererTest {
                     └── When False -> LocalPurgeOnly (Task)
             """,
         root.toTreeString());
+  }
+
+  @Test
+  @DisplayName("ForEach 1: Simple Sequential Loop")
+  void testSimpleForEach() {
+    Workflow processItem = new MockTask("ProcessItem");
+
+    Workflow forEach =
+        ForEachWorkflow.builder()
+            .name("SyncImages")
+            .itemsKey("imageList")
+            .itemVariable("currentImage")
+            .workflow(processItem)
+            .build();
+
+    assertEquals(
+        """
+                └── SyncImages [ForEach]
+                    └── FOR EACH (currentImage IN imageList) -> ProcessItem (Task)
+                """,
+        forEach.toTreeString());
+  }
+
+  @Test
+  @DisplayName("ForEach 2: Loop wrapping a Sequence")
+  void testForEachWithSequence() {
+    Workflow itemPipeline =
+        SequentialWorkflow.builder()
+            .name("ItemPipeline")
+            .workflow(new MockTask("Validate"))
+            .workflow(new MockTask("Archive"))
+            .build();
+
+    Workflow forEach =
+        ForEachWorkflow.builder()
+            .name("ArchiveBatch")
+            .itemsKey("files")
+            .itemVariable("file")
+            .workflow(itemPipeline)
+            .build();
+
+    assertEquals(
+        """
+                └── ArchiveBatch [ForEach]
+                    └── FOR EACH (file IN files) -> ItemPipeline [Sequence]
+                        ├── Validate (Task)
+                        └── Archive (Task)
+                """,
+        forEach.toTreeString());
+  }
+
+  @Test
+  @DisplayName("ForEach 3: Nested Loops (O(n^2) Visualization)")
+  void testNestedForEach() {
+    // Level 3
+    Workflow processCell = new MockTask("ProcessCell");
+
+    // Level 2
+    Workflow rowLoop =
+        ForEachWorkflow.builder()
+            .name("RowProcessor")
+            .itemsKey("currentRow")
+            .itemVariable("cell")
+            .workflow(processCell)
+            .build();
+
+    // Level 1
+    Workflow gridLoop =
+        ForEachWorkflow.builder()
+            .name("GridProcessor")
+            .itemsKey("matrix")
+            .itemVariable("currentRow")
+            .workflow(rowLoop)
+            .build();
+
+    assertEquals(
+        """
+                └── GridProcessor [ForEach]
+                    └── FOR EACH (currentRow IN matrix) -> RowProcessor [ForEach]
+                        └── FOR EACH (cell IN currentRow) -> ProcessCell (Task)
+                """,
+        gridLoop.toTreeString());
+  }
+
+  @Test
+  @DisplayName("ForEach 4: Complex Loop with Branching and Fallbacks")
+  void testComplexForEach() {
+    // A complex logic inside each iteration
+    Workflow itemLogic =
+        FallbackWorkflow.builder()
+            .name("ResilientUpdate")
+            .primary(
+                DynamicBranchingWorkflow.builder()
+                    .name("TypeRouter")
+                    .selector(_ -> "TYPE_A")
+                    .branch("TYPE_A", new MockTask("FastPath"))
+                    .defaultBranch(new MockTask("SlowPath"))
+                    .build())
+            .fallback(new MockTask("LogFailure"))
+            .build();
+
+    Workflow forEach =
+        ForEachWorkflow.builder()
+            .name("BatchProcessor")
+            .itemsKey("payloads")
+            .itemVariable("payload")
+            .workflow(itemLogic)
+            .build();
+
+    assertEquals(
+        """
+                └── BatchProcessor [ForEach]
+                    └── FOR EACH (payload IN payloads) -> ResilientUpdate [Fallback]
+                        ├── TRY (Primary) -> TypeRouter [Switch]
+                        │   ├── CASE "TYPE_A" -> FastPath (Task)
+                        │   └── DEFAULT -> SlowPath (Task)
+                        └── ON FAILURE -> LogFailure (Task)
+                """,
+        forEach.toTreeString());
+  }
+
+  @Test
+  @DisplayName("ForEach 5: Sequence containing a Loop followed by a Task")
+  void testSequenceWithLoop() {
+    Workflow loop =
+        ForEachWorkflow.builder()
+            .name("CleanTempFiles")
+            .itemsKey("oldFiles")
+            .itemVariable("f")
+            .workflow(new MockTask("DeleteFile"))
+            .build();
+
+    Workflow root =
+        SequentialWorkflow.builder()
+            .name("CleanupJob")
+            .workflow(new MockTask("IdentifyFiles"))
+            .workflow(loop)
+            .workflow(new MockTask("SendReport"))
+            .build();
+
+    assertEquals(
+        """
+                └── CleanupJob [Sequence]
+                    ├── IdentifyFiles (Task)
+                    ├── CleanTempFiles [ForEach]
+                    │   └── FOR EACH (f IN oldFiles) -> DeleteFile (Task)
+                    └── SendReport (Task)
+                """,
+        root.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Repeat 1: Simple Fixed Iteration")
+  void testSimpleRepeat() {
+    Workflow task = new MockTask("PingServer");
+    Workflow repeat =
+        RepeatWorkflow.builder()
+            .name("HealthCheckLoop")
+            .times(5)
+            .indexVariable("retryCount")
+            .workflow(task)
+            .build();
+
+    assertEquals(
+        """
+                └── HealthCheckLoop [Repeat]
+                    └── REPEAT 5 TIMES (index: retryCount) -> PingServer (Task)
+                """,
+        repeat.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Repeat 2: Repeat wrapping a Sequence")
+  void testRepeatWithSequence() {
+    Workflow seq =
+        SequentialWorkflow.builder()
+            .name("StepChain")
+            .workflow(new MockTask("Auth"))
+            .workflow(new MockTask("Fetch"))
+            .build();
+
+    Workflow repeat =
+        RepeatWorkflow.builder()
+            .name("AuthRetry")
+            .times(3)
+            .workflow(seq) // Uses default index variable "iteration"
+            .build();
+
+    assertEquals(
+        """
+                └── AuthRetry [Repeat]
+                    └── REPEAT 3 TIMES (index: iteration) -> StepChain [Sequence]
+                        ├── Auth (Task)
+                        └── Fetch (Task)
+                """,
+        repeat.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Repeat 3: Deeply Nested (Loop inside a Loop)")
+  void testNestedRepeat() {
+    Workflow leaf = new MockTask("ComputeNode");
+
+    Workflow innerRepeat =
+        RepeatWorkflow.builder()
+            .name("InnerLoop")
+            .times(2)
+            .indexVariable("j")
+            .workflow(leaf)
+            .build();
+
+    Workflow outerRepeat =
+        RepeatWorkflow.builder()
+            .name("OuterLoop")
+            .times(2)
+            .indexVariable("i")
+            .workflow(innerRepeat)
+            .build();
+
+    assertEquals(
+        """
+                └── OuterLoop [Repeat]
+                    └── REPEAT 2 TIMES (index: i) -> InnerLoop [Repeat]
+                        └── REPEAT 2 TIMES (index: j) -> ComputeNode (Task)
+                """,
+        outerRepeat.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Conditional 1: Standard If-Else")
+  void testStandardConditional() {
+    Workflow conditional =
+        ConditionalWorkflow.builder()
+            .name("IsAdmin?")
+            .condition(_ -> true)
+            .whenTrue(new MockTask("GrantAccess"))
+            .whenFalse(new MockTask("DenyAccess"))
+            .build();
+
+    assertEquals(
+        """
+                └── IsAdmin? [Conditional]
+                    ├── When True -> GrantAccess (Task)
+                    └── When False -> DenyAccess (Task)
+                """,
+        conditional.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Conditional 2: If-Only (No False Branch provided)")
+  void testConditionalNoFalse() {
+    // If no whenFalse is provided, it should default to a NoOp
+    Workflow conditional =
+        ConditionalWorkflow.builder()
+            .name("SendWelcomeEmail?")
+            .condition(_ -> false)
+            .whenTrue(new MockTask("SendEmail"))
+            .build();
+
+    assertEquals(
+        """
+                └── SendWelcomeEmail? [Conditional]
+                    └── When True -> SendEmail (Task)
+                """,
+        conditional.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Conditional 3: Nested Conditions")
+  void testNestedConditional() {
+    Workflow nested =
+        ConditionalWorkflow.builder()
+            .name("TierCheck")
+            .condition(_ -> true)
+            .whenTrue(new MockTask("PremiumLogic"))
+            .whenFalse(new MockTask("BasicLogic"))
+            .build();
+
+    Workflow root =
+        ConditionalWorkflow.builder()
+            .name("UserCheck")
+            .condition(_ -> true)
+            .whenTrue(nested)
+            .whenFalse(new MockTask("GuestLogic"))
+            .build();
+
+    assertEquals(
+        """
+                └── UserCheck [Conditional]
+                    ├── When True -> TierCheck [Conditional]
+                    │   ├── When True -> PremiumLogic (Task)
+                    │   └── When False -> BasicLogic (Task)
+                    └── When False -> GuestLogic (Task)
+                """,
+        root.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Saga 1: Simple Distributed Transaction")
+  void testSimpleSaga() {
+    Workflow saga =
+        SagaWorkflow.builder()
+            .name("OrderSaga")
+            .step(
+                SagaStep.builder()
+                    .name("ReserveStock")
+                    .action(new MockTask("StockAction"))
+                    .compensation(new MockTask("StockCleanup"))
+                    .build())
+            .step(
+                SagaStep.builder()
+                    .name("ChargeCard")
+                    .action(new MockTask("PaymentAction"))
+                    .compensation(new MockTask("RefundAction"))
+                    .build())
+            .build();
+
+    assertEquals(
+        """
+                └── OrderSaga [Saga]
+                    ├── STEP 1: ReserveStock
+                    │   ├── ACTION -> StockAction (Task)
+                    │   └── REVERT -> StockCleanup (Task)
+                    └── STEP 2: ChargeCard
+                        ├── ACTION -> PaymentAction (Task)
+                        └── REVERT -> RefundAction (Task)
+                """,
+        saga.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Saga 2: Saga Step with No Compensation")
+  void testSagaNoCompensation() {
+    Workflow saga =
+        SagaWorkflow.builder()
+            .name("EmailSaga")
+            .step(
+                SagaStep.builder()
+                    .name("SendEmail")
+                    .action(new MockTask("SmtpTask"))
+                    // No compensation possible for a send email
+                    .build())
+            .build();
+
+    assertEquals(
+        """
+                └── EmailSaga [Saga]
+                    └── STEP 1: SendEmail
+                        └── ACTION -> SmtpTask (Task)
+                """,
+        saga.toTreeString());
+  }
+
+  @Test
+  @DisplayName("Saga 3: Complex Nested Saga Actions")
+  void testComplexSagaActions() {
+    Workflow complexAction =
+        SequentialWorkflow.builder()
+            .name("MultiStepAction")
+            .workflow(new MockTask("Sub1"))
+            .workflow(new MockTask("Sub2"))
+            .build();
+
+    Workflow saga =
+        SagaWorkflow.builder()
+            .name("NestedSaga")
+            .step(
+                SagaStep.builder()
+                    .name("ComplexStep")
+                    .action(complexAction)
+                    .compensation(new MockTask("SimpleUndo"))
+                    .build())
+            .build();
+
+    assertEquals(
+        """
+                └── NestedSaga [Saga]
+                    └── STEP 1: ComplexStep
+                        ├── ACTION -> MultiStepAction [Sequence]
+                        │   ├── Sub1 (Task)
+                        │   └── Sub2 (Task)
+                        └── REVERT -> SimpleUndo (Task)
+                """,
+        saga.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 1: Script from File Provider")
+  void testJsFileVisualization() {
+    // Mocking a provider that points to a specific file
+    ScriptProvider fileProvider =
+        () ->
+            new ScriptProvider.ScriptSource(
+                "console.log('hi');",
+                java.net.URI.create("file:///deploy/scripts/calculate-tax.js"));
+
+    Workflow jsWorkflow =
+        JavascriptWorkflow.builder().name("TaxCalculator").scriptProvider(fileProvider).build();
+
+    assertEquals(
+        """
+                └── TaxCalculator [JavaScript]
+                    └── SRC -> calculate-tax.js (eval)
+                """,
+        jsWorkflow.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 2: Embedded in a Sequence")
+  void testJsInSequence() {
+    Workflow js =
+        JavascriptWorkflow.builder()
+            .name("ApplyDiscount")
+            .scriptProvider(() -> new ScriptProvider.ScriptSource("ctx.put('d', 10);", null))
+            .build();
+
+    Workflow root =
+        SequentialWorkflow.builder()
+            .name("OrderPipeline")
+            .workflow(new MockTask("LoadOrder"))
+            .workflow(js)
+            .build();
+
+    assertEquals(
+        """
+                └── OrderPipeline [Sequence]
+                    ├── LoadOrder (Task)
+                    └── ApplyDiscount [JavaScript]
+                        └── SRC -> inline (eval)
+                """,
+        root.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 3: Inline Script Visualization")
+  void testInlineJsVisualization() {
+    // When URI is null, it should display "inline"
+    Workflow js =
+        JavascriptWorkflow.builder()
+            .name("QuickMath")
+            .scriptProvider(() -> new ScriptProvider.ScriptSource("ctx.put('result', 1+1);", null))
+            .build();
+
+    assertEquals(
+        """
+                └── QuickMath [JavaScript]
+                    └── SRC -> inline (eval)
+                """,
+        js.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 4: JS inside a ForEach Loop")
+  void testJsInsideLoop() {
+    Workflow js =
+        JavascriptWorkflow.builder()
+            .name("ProcessItem")
+            .scriptProvider(
+                () ->
+                    new ScriptProvider.ScriptSource(
+                        "console.log(ctx.get('item'));",
+                        java.net.URI.create("file:///logic/transform.js")))
+            .build();
+
+    Workflow forEach =
+        ForEachWorkflow.builder()
+            .name("BatchRun")
+            .itemsKey("data")
+            .itemVariable("item")
+            .workflow(js)
+            .build();
+
+    assertEquals(
+        """
+                └── BatchRun [ForEach]
+                    └── FOR EACH (item IN data) -> ProcessItem [JavaScript]
+                        └── SRC -> transform.js (eval)
+                """,
+        forEach.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 5: Conditional Branching with JS")
+  void testJsConditional() {
+    Workflow trueJs =
+        JavascriptWorkflow.builder()
+            .name("HandleAdmin")
+            .scriptProvider(
+                () -> new ScriptProvider.ScriptSource("", java.net.URI.create("file:///admin.js")))
+            .build();
+
+    Workflow conditional =
+        ConditionalWorkflow.builder()
+            .name("RoleCheck")
+            .condition(_ -> true)
+            .whenTrue(trueJs)
+            .whenFalse(new MockTask("DefaultAccess"))
+            .build();
+
+    assertEquals(
+        """
+                └── RoleCheck [Conditional]
+                    ├── When True -> HandleAdmin [JavaScript]
+                    │   └── SRC -> admin.js (eval)
+                    └── When False -> DefaultAccess (Task)
+                """,
+        conditional.toTreeString());
+  }
+
+  @Test
+  @DisplayName("JS 6: Error Handling Visualization")
+  void testJsErrorSource() {
+    // A provider that throws an exception during source loading
+    ScriptProvider errorProvider =
+        () -> {
+          throw new RuntimeException("Disk Read Error");
+        };
+
+    Workflow js =
+        JavascriptWorkflow.builder().name("UnstableScript").scriptProvider(errorProvider).build();
+
+    assertEquals(
+        """
+                └── UnstableScript [JavaScript]
+                    └── SRC -> [Error] (eval)
+                """,
+        js.toTreeString());
   }
 
   // --- Helper Mock for Testing ---

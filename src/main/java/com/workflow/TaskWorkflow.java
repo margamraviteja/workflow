@@ -150,7 +150,7 @@ public class TaskWorkflow extends AbstractWorkflow {
   @Override
   public String getName() {
     String name = taskDescriptor.getName();
-    if (name == null) {
+    if (name == null || name.isBlank()) {
       name = taskDescriptor.getTask().getName();
     }
     return WorkflowSupport.resolveName(name, this);

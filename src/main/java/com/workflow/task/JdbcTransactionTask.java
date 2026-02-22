@@ -3,7 +3,6 @@ package com.workflow.task;
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -172,10 +171,12 @@ public class JdbcTransactionTask extends AbstractTask {
       originalAutoCommit = connection.getAutoCommit();
       connection.setAutoCommit(false);
 
+      originalIsolationLevel = connection.getTransactionIsolation();
+
       // Set isolation level if specified
-      if (isolationLevel != Connection.TRANSACTION_NONE) {
-        originalIsolationLevel = connection.getTransactionIsolation();
-        connection.setTransactionIsolation(isolationLevel);
+      int transactionIsolationLevel = getIsolationLevel();
+      if (transactionIsolationLevel != Connection.TRANSACTION_NONE) {
+        connection.setTransactionIsolation(transactionIsolationLevel);
       }
 
       // Store connection in context for nested tasks
@@ -202,23 +203,20 @@ public class JdbcTransactionTask extends AbstractTask {
     }
   }
 
-  /**
-   * Attempts to rollback the transaction on the given connection.
-   *
-   * <p>Logs a warning if rollback fails but does not throw an exception, allowing the original
-   * exception to be propagated.
-   *
-   * @param connection the database connection to rollback (may be null)
-   */
-  private static void rollback(Connection connection) {
-    if (connection != null) {
-      try {
-        connection.rollback();
-      } catch (SQLException rollbackEx) {
-        // Log rollback failure but propagate original exception
-        log.warn("Failed to rollback transaction: {}", rollbackEx.getMessage());
-      }
+  private int getIsolationLevel() {
+    switch (isolationLevel) {
+      case Connection.TRANSACTION_READ_UNCOMMITTED,
+      Connection.TRANSACTION_READ_COMMITTED,
+      Connection.TRANSACTION_REPEATABLE_READ,
+      Connection.TRANSACTION_SERIALIZABLE:
+        break; // valid levels
+      default:
+        log.warn(
+            "Invalid isolation level specified: {}. Defaulting to database default.",
+            isolationLevel);
+        return Connection.TRANSACTION_NONE;
     }
+    return isolationLevel;
   }
 
   /**
@@ -227,7 +225,7 @@ public class JdbcTransactionTask extends AbstractTask {
    * <p>Restores the original transaction isolation level and auto-commit setting before closing the
    * connection. Logs warnings if cleanup operations fail.
    *
-   * @param connection the connection to clean up (may be null)
+   * @param connection the connection to clean up (maybe null)
    * @param originalIsolationLevel the original isolation level to restore
    * @param originalAutoCommit the original auto-commit setting to restore
    */
@@ -243,7 +241,7 @@ public class JdbcTransactionTask extends AbstractTask {
         // Restore auto-commit
         connection.setAutoCommit(originalAutoCommit);
         connection.close();
-      } catch (SQLException e) {
+      } catch (Exception e) {
         log.warn("Failed to cleanup connection: {}", e.getMessage());
       }
     }

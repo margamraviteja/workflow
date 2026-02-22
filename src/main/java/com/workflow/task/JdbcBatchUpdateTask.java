@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import javax.sql.DataSource;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Executes multiple SQL statements in a batch for efficient bulk INSERT, UPDATE, or DELETE
@@ -255,6 +256,7 @@ import javax.sql.DataSource;
  * @see javax.sql.DataSource
  * @see java.sql.PreparedStatement#executeBatch()
  */
+@Slf4j
 public class JdbcBatchUpdateTask extends AbstractTask {
 
   private final DataSource dataSource;
@@ -316,21 +318,43 @@ public class JdbcBatchUpdateTask extends AbstractTask {
       return;
     }
 
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = getConnection(context);
 
-      for (List<Object> rowParams : effectiveBatchParams) {
-        for (int i = 0; i < rowParams.size(); i++) {
-          stmt.setObject(i + 1, rowParams.get(i));
-        }
-        stmt.addBatch();
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
+      if (!isShared) {
+        conn.setAutoCommit(false);
       }
 
-      int[] updateCounts = stmt.executeBatch();
-      context.put(outputKey, updateCounts);
+      try (PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+        for (List<Object> rowParams : effectiveBatchParams) {
+          for (int i = 0; i < rowParams.size(); i++) {
+            stmt.setObject(i + 1, rowParams.get(i));
+          }
+          stmt.addBatch();
+        }
+
+        int[] updateCounts = stmt.executeBatch();
+        context.put(outputKey, updateCounts);
+      }
+
+      if (!isShared) {
+        conn.commit();
+      }
 
     } catch (Exception e) {
+      if (!isShared) {
+        rollback(conn);
+      }
       throw new TaskExecutionException("Batch update failed", e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

@@ -111,7 +111,7 @@ import java.nio.charset.StandardCharsets;
  *   <li><b>Immutable:</b> Scripts cannot be hot-reloaded without redeploying application
  *   <li><b>Versioned:</b> Script changes require new application deployment
  *   <li><b>Portable:</b> Works consistently across different environments
- *   <li><b>Fast Loading:</b> Resources are loaded from memory when JARred
+ *   <li><b>Fast Loading:</b> Resources are loaded from memory when JARed
  * </ul>
  *
  * <h3>When to Use:</h3>

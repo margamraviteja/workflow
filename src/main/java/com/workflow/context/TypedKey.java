@@ -31,11 +31,11 @@ public final class TypedKey<T> {
     return new TypedKey<>(name, type);
   }
 
-  String name() {
+  public String name() {
     return name;
   }
 
-  Class<T> type() {
+  public Class<T> type() {
     return type;
   }
 

@@ -5,8 +5,10 @@ import com.workflow.ChaosWorkflow.ChaosWorkflowBuilder;
 import com.workflow.ConditionalWorkflow.ConditionalWorkflowBuilder;
 import com.workflow.DynamicBranchingWorkflow.DynamicBranchingWorkflowBuilder;
 import com.workflow.FallbackWorkflow.FallbackWorkflowBuilder;
+import com.workflow.ForEachWorkflow.ForEachWorkflowBuilder;
 import com.workflow.ParallelWorkflow.ParallelWorkflowBuilder;
 import com.workflow.RateLimitedWorkflow.RateLimitedWorkflowBuilder;
+import com.workflow.RepeatWorkflow.RepeatWorkflowBuilder;
 import com.workflow.SagaWorkflow.SagaWorkflowBuilder;
 import com.workflow.SequentialWorkflow.SequentialWorkflowBuilder;
 import com.workflow.TimeoutWorkflow.TimeoutWorkflowBuilder;
@@ -62,6 +64,28 @@ public class Workflows {
    */
   public static DynamicBranchingWorkflowBuilder dynamic(String name) {
     return DynamicBranchingWorkflow.builder().name(name);
+  }
+
+  /**
+   * Creates a builder for a {@link RepeatWorkflow}, which executes a workflow a fixed number of
+   * times.
+   *
+   * @param name The unique name of the repeat workflow.
+   * @return A new {@link RepeatWorkflowBuilder} instance.
+   */
+  public static RepeatWorkflowBuilder repeat(String name) {
+    return RepeatWorkflow.builder().name(name);
+  }
+
+  /**
+   * Creates a builder for a {@link ForEachWorkflow}, which iterates over a collection and executes
+   * a workflow for each item.
+   *
+   * @param name The unique name of the forEach workflow.
+   * @return A new {@link ForEachWorkflowBuilder} instance.
+   */
+  public static ForEachWorkflowBuilder forEach(String name) {
+    return ForEachWorkflow.builder().name(name);
   }
 
   /**

@@ -7,6 +7,8 @@
 - [File Tasks](#file-tasks)
 - [Database Tasks](#database-tasks)
 - [Processing Tasks](#processing-tasks)
+- [Timing Tasks](#timing-tasks)
+- [Logging Tasks](#logging-tasks)
 - [Utility Tasks](#utility-tasks)
 - [Creating Custom Tasks](#creating-custom-tasks)
 
@@ -38,6 +40,7 @@ Task (interface)
     ├── AbstractTask (abstract)
     │   ├── DelayTask
     │   ├── NoOpTask
+    │   ├── LogTask
     │   ├── FileReadTask
     │   ├── FileWriteTask
     │   ├── ShellCommandTask
@@ -1654,6 +1657,282 @@ ShellCommandTask csvProcess = ShellCommandTask.builder()
 - Validate command arguments
 - Consider command injection risks
 - Run with minimal privileges
+
+## Timing Tasks
+
+### DelayTask
+
+Introduces a deliberate pause in workflow execution.
+
+**Purpose**: Rate limiting, pacing requests, waiting for processes, testing timeout behaviors
+
+**Features**:
+- Configurable delay duration in milliseconds
+- Thread blocking behavior
+- Respects thread interruption
+- Idempotent operation
+
+**Constructor**:
+```java
+DelayTask(long millis);
+```
+
+**Examples**:
+
+```java
+// Simple delay
+Task delayTask = new DelayTask(2000);  // 2 second delay
+WorkflowContext context = new WorkflowContext();
+delayTask.execute(context);
+
+// Rate limiting in sequential workflow
+SequentialWorkflow rateLimitedPipeline = SequentialWorkflow.builder()
+    .name("RateLimitedApi")
+    .task(new GetHttpTask.Builder<>(client)
+        .url("https://api.example.com/request1")
+        .build())
+    .task(new DelayTask(1000))  // 1 second rate limiting
+    .task(new GetHttpTask.Builder<>(client)
+        .url("https://api.example.com/request2")
+        .build())
+    .task(new DelayTask(1000))  // 1 second rate limiting
+    .task(new GetHttpTask.Builder<>(client)
+        .url("https://api.example.com/request3")
+        .build())
+    .build();
+
+WorkflowResult result = rateLimitedPipeline.execute(context);
+
+// Retry backoff pattern
+public Workflow buildRetryWorkflow(Workflow action) {
+    return SequentialWorkflow.builder()
+            .task(action)
+            .task(new DelayTask(5000))  // 5 second backoff
+            .task(action)
+            .task(new DelayTask(10000))  // 10 second backoff
+            .task(action)
+            .build();
+}
+
+// Polling with intervals
+public Workflow buildPollingWorkflow() {
+    return SequentialWorkflow.builder()
+            .name("PollingWorkflow")
+            .task(context -> checkExternalStatus(context))  // Check status
+            .task(new DelayTask(2000))  // Wait 2 seconds
+            .task(context -> checkExternalStatus(context))  // Check again
+            .task(new DelayTask(5000))  // Wait longer
+            .task(context -> checkExternalStatus(context))  // Final check
+            .build();
+}
+```
+
+**Context Usage**:
+- **Inputs**: None
+- **Outputs**: None (no context mutation)
+
+**Error Handling**:
+- Throws `TaskExecutionException` if thread is interrupted during delay
+- Re-interrupts the thread to preserve interrupt status
+- All resources are cleaned up properly
+
+**Performance Implications**:
+- **Thread Blocking**: Blocks the executing thread for entire duration
+- **Parallel Workflows**: Reduces parallelism if used in parallel execution
+- **No Async Alternative**: This is a synchronous blocking delay (no async version currently)
+
+**Best Practices**:
+- Use for rate limiting between API calls
+- Use for polling intervals with bounded retries
+- Keep delays reasonable (typically milliseconds to seconds)
+- Consider using in sequential workflows rather than parallel
+- Avoid very long delays in parallel execution paths
+- Test timeout behavior with delays in critical paths
+- Monitor total workflow duration when using multiple delays
+
+**Thread Safety**:
+- This task is thread-safe
+- Multiple threads can safely execute delay tasks concurrently
+- Each thread gets its own independent delay
+
+## Logging Tasks
+
+### LogTask
+
+Logs messages to SLF4J at configurable log levels.
+
+**Purpose**: Instrument workflows with logging for monitoring and debugging
+
+**Features**:
+- Multiple log levels: TRACE, DEBUG, INFO, WARN, ERROR
+- Configurable logger name
+- Optional exception logging
+- Message parameter formatting
+- Efficient level checking to avoid unnecessary formatting
+- Fluent builder API
+
+**Log Levels**:
+```
+LogTask.LogLevel.TRACE   - Finest-grained informational messages
+LogTask.LogLevel.DEBUG   - Detailed diagnostic information
+LogTask.LogLevel.INFO    - General informational messages (default)
+LogTask.LogLevel.WARN    - Warning messages for potentially harmful situations
+LogTask.LogLevel.ERROR   - Error messages with optional exception
+```
+
+**Builder Configuration**:
+```
+LogTask.builder()
+    .message(String)                    // Log message template (required)
+    .parameters(Object...)              // Message parameters (optional)
+    .level(LogLevel)                    // Log level (default: INFO)
+    .throwable(Throwable)               // Exception to log (optional)
+    .loggerName(String)                 // Logger name (default: "workflow.log")
+    .logger(Logger)                     // Pre-configured SLF4J Logger (optional)
+    .build()
+```
+
+**Examples**:
+
+```java
+// Basic informational logging
+LogTask infoLog = LogTask.builder()
+    .message("Workflow started")
+    .level(LogTask.LogLevel.INFO)
+    .build();
+
+WorkflowContext context = new WorkflowContext();
+infoLog.execute(context);
+
+// Debug logging with parameters
+LogTask debugLog = LogTask.builder()
+    .message("Processing user {} with order {}")
+    .parameters("user-123", "order-456")
+    .level(LogTask.LogLevel.DEBUG)
+    .loggerName("com.myapp.orders")
+    .build();
+
+debugLog.execute(context);
+
+// Error logging with exception
+Exception error = new RuntimeException("Database connection failed");
+LogTask errorLog = LogTask.builder()
+    .message("Failed to load user data")
+    .level(LogTask.LogLevel.ERROR)
+    .throwable(error)
+    .build();
+
+errorLog.execute(context);
+
+// Dynamic message from context
+public Workflow buildLoggingWorkflow() {
+    return SequentialWorkflow.builder()
+        .name("DataProcessingWithLogging")
+        .task(context -> {
+            // Setup
+            context.put("batchSize", 100);
+            context.put("processingLevel", LogTask.LogLevel.DEBUG);
+        })
+        .task(LogTask.builder()
+            .message("Starting batch processing")
+            .level(LogTask.LogLevel.INFO)
+            .loggerName("com.workflow.batch")
+            .build())
+        .task(context -> {
+            // Processing
+            int processed = 0;
+            context.put("processedCount", processed);
+        })
+        .task(LogTask.builder()
+            .message("Processed {} items")
+            .parameters(100)
+            .level(LogTask.LogLevel.INFO)
+            .build())
+        .build();
+}
+
+// Audit logging
+LogTask auditLog = LogTask.builder()
+    .message("User {} accessed resource {} at {}")
+    .parameters("admin", "financial_report", System.currentTimeMillis())
+    .level(LogTask.LogLevel.WARN)
+    .loggerName("com.myapp.audit")
+    .build();
+
+// Conditional logging in workflow
+public Workflow buildConditionalLoggingWorkflow() {
+    return SequentialWorkflow.builder()
+        .task(context -> {
+            Integer errorCount = context.getTyped("errorCount", Integer.class);
+            if (errorCount != null && errorCount > 10) {
+                LogTask alertLog = LogTask.builder()
+                    .message("High error rate detected: {} errors")
+                    .parameters(errorCount)
+                    .level(LogTask.LogLevel.ERROR)
+                    .loggerName("com.workflow.alerts")
+                    .build();
+                alertLog.execute(context);
+            }
+        })
+        .build();
+}
+
+// Trace logging for detailed debugging
+LogTask traceLog = LogTask.builder()
+    .message("Variable state: key={}, value={}, type={}")
+    .parameters("userId", "user-123", "String")
+    .level(LogTask.LogLevel.TRACE)
+    .loggerName("com.myapp.debug")
+    .build();
+```
+
+**Context Usage**:
+- **Inputs** (from context, with fallback to builder values):
+  - Optional `message` (String) - Override builder message
+  - Optional `parameters` (Object[]) - Override builder parameters
+  - Optional `throwable` (Throwable) - Override builder throwable
+- **Outputs**: None (logging only, no context mutation)
+
+**Logger Name Hierarchy**:
+- If both logger instance and name are provided: logger instance takes precedence
+- Default logger name: `"workflow.log"`
+- Use hierarchical names: `"com.myapp.orders"`, `"com.workflow.batch"`, etc.
+
+**Error Handling**:
+- Throws `TaskExecutionException` on:
+  - Null message (required field)
+  - Logging framework failures (rare)
+- Invalid log levels are caught during task construction
+
+**Message Formatting**:
+- Supports SLF4J placeholder syntax: `{}`
+- Example: `"User {} logged in at {}"`
+- Parameters are passed separately to SLF4J for efficient formatting
+- Null parameters are handled gracefully
+
+**Performance Considerations**:
+- **Level Checking**: Task checks if level is enabled before formatting messages
+- **Lazy Formatting**: Message formatting only happens if level is enabled
+- **No Overhead**: When level is disabled, minimal CPU impact
+- **String Allocation**: Each logging call allocates log record (normal SLF4J behavior)
+
+**Best Practices**:
+- Use TRACE for detailed debugging (enable only when troubleshooting)
+- Use DEBUG for diagnostic information during development
+- Use INFO for important workflow milestones
+- Use WARN for recoverable issues that need attention
+- Use ERROR for serious failures
+- Use meaningful logger names organized by component
+- Include relevant context in log messages
+- Use parameters instead of string concatenation for efficiency
+- Log at critical workflow steps (start, end, failures, decisions)
+- Avoid logging in tight loops or high-frequency tasks
+- Use different loggers for different concerns (audit, business logic, debugging)
+
+**Thread Safety**:
+- This task is thread-safe
+- SLF4J itself is thread-safe
+- Multiple threads can log concurrently without coordination
 
 ## Utility Tasks
 

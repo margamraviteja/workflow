@@ -260,40 +260,52 @@ public class JdbcStreamingQueryTask extends AbstractTask {
     // Determine row callback source
     Consumer<Map<String, Object>> effectiveCallback = getRowCallback(context);
 
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = getConnection(context);
+
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+
     long rowCount = 0;
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt =
-            conn.prepareStatement(
-                effectiveSql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
-
-      // Configure statement
-      stmt.setFetchSize(fetchSize);
-      if (queryTimeout > 0) {
-        stmt.setQueryTimeout(queryTimeout);
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
+      if (!isShared) {
+        conn.setReadOnly(true);
       }
 
-      // Bind parameters
-      for (int i = 0; i < effectiveParams.size(); i++) {
-        stmt.setObject(i + 1, effectiveParams.get(i));
-      }
+      try (PreparedStatement stmt =
+          conn.prepareStatement(
+              effectiveSql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+        // Configure statement
+        stmt.setFetchSize(fetchSize);
+        if (queryTimeout > 0) {
+          stmt.setQueryTimeout(queryTimeout);
+        }
 
-      // Execute and stream results
-      try (ResultSet rs = stmt.executeQuery()) {
-        ResultSetMetaData metaData = rs.getMetaData();
-        int columnCount = metaData.getColumnCount();
+        // Bind parameters
+        for (int i = 0; i < effectiveParams.size(); i++) {
+          stmt.setObject(i + 1, effectiveParams.get(i));
+        }
 
-        while (rs.next()) {
-          // Convert row to map
-          Map<String, Object> row = new LinkedHashMap<>();
-          for (int i = 1; i <= columnCount; i++) {
-            String columnName = metaData.getColumnLabel(i);
-            Object value = rs.getObject(i);
-            row.put(columnName, value);
+        // Execute and stream results
+        try (ResultSet rs = stmt.executeQuery()) {
+          ResultSetMetaData metaData = rs.getMetaData();
+          int columnCount = metaData.getColumnCount();
+
+          while (rs.next()) {
+            // Convert row to map
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (int i = 1; i <= columnCount; i++) {
+              String columnName = metaData.getColumnLabel(i);
+              Object value = rs.getObject(i);
+              row.put(columnName, value);
+            }
+
+            // Invoke callback
+            callRowCallback(effectiveCallback, row, rowCount);
+            rowCount++;
           }
-
-          // Invoke callback
-          callRowCallback(effectiveCallback, row, rowCount);
-          rowCount++;
         }
       }
 
@@ -305,6 +317,10 @@ public class JdbcStreamingQueryTask extends AbstractTask {
     } catch (SQLException e) {
       throw new TaskExecutionException(
           "Streaming query failed after processing " + rowCount + " rows: " + e.getMessage(), e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

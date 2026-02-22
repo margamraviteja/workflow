@@ -225,6 +225,9 @@ public interface RetryPolicy {
    * @see RetryPolicy
    */
   interface BackoffStrategy {
+
+    SecureRandom RANDOM = new SecureRandom();
+
     /**
      * Compute the delay in milliseconds for the given retry attempt.
      *
@@ -289,10 +292,9 @@ public interface RetryPolicy {
     static BackoffStrategy exponentialWithJitter(
         long baseDelayMs, long maxDelayMs, double jitterFactor) {
       return attempt -> {
-        SecureRandom random = new SecureRandom();
         long expDelay = (long) (baseDelayMs * Math.pow(2, attempt - 1.0));
-        long jitter = (long) (baseDelayMs * jitterFactor * random.nextDouble());
-        jitter *= random.nextBoolean() ? 1 : -1;
+        long jitter = (long) (baseDelayMs * jitterFactor * RANDOM.nextDouble());
+        jitter *= RANDOM.nextBoolean() ? 1 : -1;
         return Math.min(expDelay + jitter, maxDelayMs);
       };
     }

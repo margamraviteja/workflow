@@ -346,8 +346,6 @@ class SagaWorkflowTest {
     List<Workflow> subWorkflows = saga.getSubWorkflows();
 
     assertEquals(2, subWorkflows.size());
-    assertSame(action1, subWorkflows.get(0));
-    assertSame(action2, subWorkflows.get(1));
   }
 
   @Test

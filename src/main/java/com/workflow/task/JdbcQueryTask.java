@@ -287,26 +287,38 @@ public class JdbcQueryTask extends AbstractTask {
     // Determine parameters source (direct or from context)
     List<Object> effectiveParams = getQueryParams(context);
 
-    List<Map<String, Object>> results = new ArrayList<>();
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = (Connection) context.get(JdbcTransactionTask.CONNECTION_CONTEXT_KEY);
 
-      for (int i = 0; i < effectiveParams.size(); i++) {
-        stmt.setObject(i + 1, effectiveParams.get(i));
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+
+    List<Map<String, Object>> results = new ArrayList<>();
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
+      if (!isShared) {
+        conn.setReadOnly(true);
       }
 
-      try (ResultSet rs = stmt.executeQuery()) {
-        ResultSetMetaData metaData = rs.getMetaData();
-        int columnCount = metaData.getColumnCount();
+      try (PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+        for (int i = 0; i < effectiveParams.size(); i++) {
+          stmt.setObject(i + 1, effectiveParams.get(i));
+        }
 
-        while (rs.next()) {
-          Map<String, Object> row = new LinkedHashMap<>();
-          for (int i = 1; i <= columnCount; i++) {
-            Object value = rs.getObject(i);
-            String columnLabel = metaData.getColumnLabel(i);
-            row.put(columnLabel, convertJdbcValue(value));
+        try (ResultSet rs = stmt.executeQuery()) {
+          ResultSetMetaData metaData = rs.getMetaData();
+          int columnCount = metaData.getColumnCount();
+
+          while (rs.next()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (int i = 1; i <= columnCount; i++) {
+              Object value = rs.getObject(i);
+              String columnLabel = metaData.getColumnLabel(i);
+              row.put(columnLabel, convertJdbcValue(value));
+            }
+            results.add(row);
           }
-          results.add(row);
         }
       }
 
@@ -315,6 +327,10 @@ public class JdbcQueryTask extends AbstractTask {
 
     } catch (Exception e) {
       throw new TaskExecutionException("Query failed: " + e.getMessage(), e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

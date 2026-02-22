@@ -88,4 +88,43 @@ public final class ScopedWorkflowContext extends WorkflowContext {
   public <T> T getTyped(String key, TypeReference<T> typeRef, T defaultValue) {
     return delegate.getTyped(scoped(key), typeRef, defaultValue);
   }
+
+  // --- Remove Overrides ---
+
+  @Override
+  public Object remove(String key) {
+    return delegate.remove(scoped(key));
+  }
+
+  @Override
+  public <T> T remove(String key, Class<T> type) {
+    return delegate.remove(scoped(key), type);
+  }
+
+  @Override
+  public <T> T remove(TypedKey<T> key) {
+    Objects.requireNonNull(key, "TypedKey must not be null");
+    // We must cast the result back to the type defined in the TypedKey
+    Object removedValue = delegate.remove(scoped(key.name()));
+    return removedValue == null ? null : key.type().cast(removedValue);
+  }
+
+  // --- Scoping Depth (Support for nested scopes) ---
+
+  @Override
+  public WorkflowContext scope(String namespace) {
+    // This allows for nested scoping: context.scope("stage1").scope("subtask")
+    // Resulting in keys like: "stage1.subtask.myKey"
+    return new ScopedWorkflowContext(this, namespace);
+  }
+
+  // --- Copying logic ---
+
+  @Override
+  public WorkflowContext copy() {
+    // When copying a scoped context, we return a standard WorkflowContext
+    // containing only the data from this specific namespace, but flattened.
+    // Or we can return a scoped view of a copy. Delegation is usually safer:
+    return new ScopedWorkflowContext(delegate.copy(), this.prefix);
+  }
 }

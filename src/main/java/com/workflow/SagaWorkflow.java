@@ -2,6 +2,7 @@ package com.workflow;
 
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.SagaCompensationException;
+import com.workflow.helper.TreeRenderer;
 import com.workflow.helper.ValidationUtils;
 import com.workflow.helper.WorkflowSupport;
 import com.workflow.saga.SagaStep;
@@ -290,18 +291,43 @@ public class SagaWorkflow extends AbstractWorkflow implements WorkflowContainer 
     return WorkflowSupport.formatWorkflowType("Saga");
   }
 
-  /**
-   * Returns the action workflows from all steps for container traversal.
-   *
-   * @return unmodifiable list of action workflows
-   */
   @Override
   public List<Workflow> getSubWorkflows() {
-    List<Workflow> subWorkflows = new ArrayList<>();
-    for (SagaStep step : steps) {
-      subWorkflows.add(step.getAction());
+    List<Workflow> treeNodes = new ArrayList<>();
+
+    for (int i = 0; i < steps.size(); i++) {
+      SagaStep step = steps.get(i);
+      String stepLabel = String.format("STEP %d: %s", i + 1, step.getName());
+
+      // Create a custom container for the step to show both paths
+      treeNodes.add(new SagaStepVisualizer(stepLabel, step));
     }
-    return Collections.unmodifiableList(subWorkflows);
+
+    return Collections.unmodifiableList(treeNodes);
+  }
+
+  /** Inner helper to render the Action/Compensation pair for a single Saga step. */
+  private record SagaStepVisualizer(String label, SagaStep step)
+      implements Workflow, WorkflowContainer {
+    @Override
+    public String getName() {
+      return label;
+    }
+
+    @Override
+    public WorkflowResult execute(WorkflowContext c) {
+      return null;
+    }
+
+    @Override
+    public List<Workflow> getSubWorkflows() {
+      List<Workflow> paths = new ArrayList<>();
+      paths.add(new TreeRenderer.TreeLabelWrapper("ACTION ->", step.getAction()));
+      if (step.hasCompensation()) {
+        paths.add(new TreeRenderer.TreeLabelWrapper("REVERT ->", step.getCompensation()));
+      }
+      return paths;
+    }
   }
 
   /**

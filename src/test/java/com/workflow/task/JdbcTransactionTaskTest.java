@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
+import com.workflow.exception.TaskValidationException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -292,7 +293,7 @@ class JdbcTransactionTaskTest {
       JdbcTransactionTask task =
           JdbcTransactionTask.builder().dataSource(dataSource).task(mockTask1).build();
       assertThrows(
-          IllegalStateException.class, () -> task.require(context, "missing", String.class));
+          TaskValidationException.class, () -> task.require(context, "missing", String.class));
     }
 
     @Test

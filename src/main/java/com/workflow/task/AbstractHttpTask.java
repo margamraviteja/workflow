@@ -64,6 +64,7 @@ import java.util.function.Function;
  * @see PutHttpTask
  * @see DeleteHttpTask
  * @see HttpTaskBodyHelper
+ * @see com.workflow.helper.HttpResponseWrapper
  * @see com.workflow.helper.ResponseMappers
  */
 public abstract class AbstractHttpTask<T> extends AbstractTask {
@@ -75,13 +76,16 @@ public abstract class AbstractHttpTask<T> extends AbstractTask {
   public static final String DEFAULT_HTTP_RESPONSE_KEY = "httpResponse";
 
   protected final HttpClient httpClient;
+  protected final Duration timeout;
+
   protected final String url;
   protected final String urlContextKey;
+
   protected final Map<String, String> headers;
   protected final Map<String, String> queryParams;
-  protected final Duration timeout;
-  protected final Function<HttpResponse<String>, T> responseMapper;
+
   protected final BiConsumer<HttpRequest.Builder, WorkflowContext> requestCustomizer;
+  protected final Function<HttpResponse<String>, T> responseMapper;
   protected final String responseContextKey;
 
   protected AbstractHttpTask(Builder<?, ?, T> builder) {
@@ -92,6 +96,10 @@ public abstract class AbstractHttpTask<T> extends AbstractTask {
     this.queryParams = Collections.unmodifiableMap(new LinkedHashMap<>(builder.queryParams));
     this.timeout = builder.timeout;
 
+    this.requestCustomizer = builder.requestCustomizer;
+    this.responseContextKey =
+        builder.responseContextKey != null ? builder.responseContextKey : DEFAULT_HTTP_RESPONSE_KEY;
+
     if (builder.responseMapper != null) {
       this.responseMapper = builder.responseMapper;
     } else if (builder.responseType != null) {
@@ -99,9 +107,6 @@ public abstract class AbstractHttpTask<T> extends AbstractTask {
     } else {
       this.responseMapper = defaultResponseMapper();
     }
-    this.requestCustomizer = builder.requestCustomizer;
-    this.responseContextKey =
-        builder.responseContextKey != null ? builder.responseContextKey : DEFAULT_HTTP_RESPONSE_KEY;
   }
 
   @Override

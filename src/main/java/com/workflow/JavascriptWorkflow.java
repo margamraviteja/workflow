@@ -7,6 +7,7 @@ import com.workflow.helper.WorkflowSupport;
 import com.workflow.script.ScriptProvider;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.List;
 import org.graalvm.polyglot.*;
 import org.graalvm.polyglot.io.IOAccess;
 
@@ -76,7 +77,7 @@ import org.graalvm.polyglot.io.IOAccess;
  * @see ScriptProvider
  * @see AbstractWorkflow
  */
-public class JavascriptWorkflow extends AbstractWorkflow {
+public class JavascriptWorkflow extends AbstractWorkflow implements WorkflowContainer {
   /**
    * Shared engine instance to optimize performance (JIT and AST caching) across all JavaScript
    * workflow executions.
@@ -202,6 +203,43 @@ public class JavascriptWorkflow extends AbstractWorkflow {
   @Override
   public String getWorkflowType() {
     return WorkflowSupport.formatWorkflowType("JavaScript");
+  }
+
+  @Override
+  public List<Workflow> getSubWorkflows() {
+    try {
+      ScriptProvider.ScriptSource source = scriptProvider.loadScript();
+      String uriDisplay =
+          (source.uri() != null && source.uri().getPath() != null)
+              ? java.nio.file.Paths.get(source.uri().getPath()).getFileName().toString()
+              : "inline";
+
+      // Use the uriDisplay directly as the name of the leaf node
+      return List.of(new AtomicScriptLeaf("SRC -> " + uriDisplay));
+    } catch (Exception _) {
+      return List.of(new AtomicScriptLeaf("SRC -> [Error]"));
+    }
+  }
+
+  /**
+   * A leaf node specifically for the tree representation. By returning the full label as getName(),
+   * we avoid the double-space issue caused by the Wrapper/Delegate combination.
+   */
+  private record AtomicScriptLeaf(String label) implements Workflow {
+    @Override
+    public String getName() {
+      return label;
+    }
+
+    @Override
+    public String getWorkflowType() {
+      return "(eval)";
+    }
+
+    @Override
+    public WorkflowResult execute(WorkflowContext c) {
+      return null;
+    }
   }
 
   /** Fluent builder for {@link JavascriptWorkflow} instances. */

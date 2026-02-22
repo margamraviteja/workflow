@@ -23,10 +23,13 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 - **Parallel**: Run workflows concurrently with configurable strategies
 - **Conditional**: Branch based on runtime conditions
 - **Dynamic Branching**: Multi-way routing with selector functions
+- **Repeat**: Execute workflow a fixed number of times with iteration tracking
+- **ForEach**: Iterate over collections and process each item
 - **Fallback**: Graceful error recovery with primary/fallback pattern
 - **Saga**: Distributed transactions with compensating actions for rollback
 - **Rate Limited**: Control execution frequency with multiple algorithms
 - **Timeout**: Add time constraints to any workflow
+- **Chaos**: Resilience testing with controlled failure injection
 - **JavaScript**: Execute dynamic business logic with full ESM support
 
 ### 🚀 **JavaScript Workflow with ESM Support**
@@ -38,9 +41,11 @@ The Workflow Engine is a comprehensive orchestration framework that allows you t
 
 ### 🔧 **Rich Task Library**
 - HTTP tasks (GET, POST, PUT, DELETE)
-- JDBC database operations (Query, Update, Batch)
-- File I/O operations
+- JDBC database operations (Query, Update, Batch, Callable, Streaming, Typed, Transactions)
+- File I/O operations (Read, Write)
 - Shell command execution
+- Logging with configurable levels (TRACE, DEBUG, INFO, WARN, ERROR)
+- Timing control (Delays, Rate limiting)
 - Conditional execution
 - Composite and Parallel task execution
 
@@ -710,6 +715,53 @@ public class WorkflowSecurity {
     }
 }
 ```
+
+### Repeat Workflow
+Executes a child workflow a fixed number of times with index tracking.
+
+```java
+public class RepeatPatternExample {
+    public Workflow buildRetryLoop(Workflow task) {
+        return RepeatWorkflow.builder()
+                .name("RetryLoop")
+                .times(3)
+                .indexVariable("attempt")
+                .workflow(task)
+                .build();
+    }
+}
+```
+
+**Features:**
+- Fixed iteration count
+- Optional index variable binding (default: "iteration")
+- Fails fast on first failure
+- Thread-safe execution
+
+### ForEach Workflow
+Iterates over a collection and executes a child workflow for each item.
+
+```java
+public class ForEachPatternExample {
+    public Workflow buildBatchProcessor(Workflow processItem) {
+        return ForEachWorkflow.builder()
+                .name("ProcessAllItems")
+                .itemsKey("itemList")
+                .itemVariable("currentItem")
+                .indexVariable("itemIndex")
+                .workflow(processItem)
+                .build();
+    }
+}
+```
+
+**Features:**
+- Collection iteration (List, Set, Array, etc.)
+- Per-item variable binding
+- Optional index tracking
+- Fails fast on first failure
+- Handles null/empty collections gracefully
+- Thread-safe execution
 
 ## Built-in Tasks
 

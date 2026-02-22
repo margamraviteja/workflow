@@ -160,18 +160,41 @@ public class JdbcUpdateTask extends AbstractTask {
     // Determine parameters source
     List<Object> effectiveParams = getQueryParams(context);
 
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = getConnection(context);
 
-      for (int i = 0; i < effectiveParams.size(); i++) {
-        stmt.setObject(i + 1, effectiveParams.get(i));
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
+      if (!isShared) {
+        conn.setAutoCommit(false);
       }
 
-      int rowsAffected = stmt.executeUpdate();
-      context.put(outputKey, rowsAffected);
+      try (PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+        for (int i = 0; i < effectiveParams.size(); i++) {
+          stmt.setObject(i + 1, effectiveParams.get(i));
+        }
+
+        int rowsAffected = stmt.executeUpdate();
+        context.put(outputKey, rowsAffected);
+      }
+
+      if (!isShared) {
+        conn.commit();
+      }
 
     } catch (Exception e) {
+      if (!isShared) {
+        rollback(conn);
+      }
       throw new TaskExecutionException("Update execution failed: " + e.getMessage(), e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

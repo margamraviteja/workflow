@@ -41,11 +41,20 @@ public static ConditionalWorkflowBuilder conditional(String name);
 // Dynamic branching workflow builder
 public static DynamicBranchingWorkflowBuilder dynamic(String name);
 
+// Repeat workflow builder
+public static RepeatWorkflowBuilder repeat(String name);
+
+// ForEach workflow builder
+public static ForEachWorkflowBuilder forEach(String name);
+
 // Fallback workflow builder
 public static FallbackWorkflowBuilder fallback(String name);
 
 // Saga workflow builder
 public static SagaWorkflowBuilder saga(String name);
+
+// Chaos workflow builder
+public static ChaosWorkflowBuilder chaos(String name);
 
 // Rate-limited workflow builder
 public static RateLimitedWorkflowBuilder rateLimited(String name);
@@ -94,11 +103,35 @@ public class WorkflowFactory {
             .build();
     }
     
+    public Workflow createRepeatWorkflow() {
+        return repeat("RetryLoop")
+            .times(3)
+            .indexVariable("attempt")
+            .workflow(unreliableTask)
+            .build();
+    }
+    
+    public Workflow createForEachWorkflow() {
+        return forEach("ProcessUsers")
+            .itemsKey("userList")
+            .itemVariable("user")
+            .indexVariable("index")
+            .workflow(processUserTask)
+            .build();
+    }
+    
     public Workflow createSagaWorkflow() {
         return saga("OrderSaga")
             .step(reserveInventoryTask, releaseInventoryTask)
             .step(chargePaymentTask, refundPaymentTask)
             .step(shipOrderTask, cancelShipmentTask)
+            .build();
+    }
+    
+    public Workflow createChaosTestWorkflow() {
+        return chaos("ResilenceTest")
+            .workflow(apiCallTask)
+            .strategy(FailureInjectionStrategy.withProbability(0.3))
             .build();
     }
 }
@@ -117,6 +150,11 @@ public Workflow createComplexPipeline() {
             .condition(ctx -> isDataValid(ctx))
             .whenTrue(processWorkflow)
             .whenFalse(errorWorkflow)
+            .build())
+        .workflow(forEach("ProcessBatches")
+            .itemsKey("batches")
+            .itemVariable("batch")
+            .workflow(batchProcessingTask)
             .build())
         .build();
 }

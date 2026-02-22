@@ -10,4 +10,8 @@ public final class TestContexts {
     }
     return ctx;
   }
+
+  public static WorkflowContext emptyContext() {
+    return new WorkflowContext();
+  }
 }

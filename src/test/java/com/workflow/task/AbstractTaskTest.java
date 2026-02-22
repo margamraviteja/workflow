@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.workflow.context.WorkflowContext;
 import com.workflow.exception.TaskExecutionException;
+import com.workflow.exception.TaskValidationException;
 import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,8 +97,8 @@ class AbstractTaskTest {
     TaskExecutionException exception =
         assertThrows(TaskExecutionException.class, () -> task.execute(context));
 
-    assertInstanceOf(IllegalStateException.class, exception.getCause());
-    assertTrue(exception.getCause().getMessage().contains("Required key missing: missingKey"));
+    assertInstanceOf(TaskValidationException.class, exception);
+    assertTrue(exception.getMessage().contains("Required key missing: missingKey"));
   }
 
   @Test

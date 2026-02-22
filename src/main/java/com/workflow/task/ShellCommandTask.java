@@ -144,6 +144,7 @@ public class ShellCommandTask extends AbstractTask {
   protected void doExecute(WorkflowContext context) throws TaskExecutionException {
     try {
       ProcessBuilder pb = new ProcessBuilder(command);
+      pb.redirectErrorStream(true); // Merges stderr into stdout
       Process p = pb.start();
       int exit = p.waitFor();
       String output;

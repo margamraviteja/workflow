@@ -52,6 +52,7 @@ import com.workflow.exception.TaskExecutionException;
  * @see WorkflowContext
  * @see TaskDescriptor
  */
+@FunctionalInterface
 public interface Task {
   /**
    * Execute the task with the provided {@link WorkflowContext}. Implementations may throw a {@link

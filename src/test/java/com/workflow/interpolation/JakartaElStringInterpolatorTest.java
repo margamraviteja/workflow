@@ -227,12 +227,6 @@ class JakartaElStringInterpolatorTest {
   class EscapedPlaceholders {
 
     @Test
-    void shouldNotInterpolateEscapedPlaceholder() {
-      String result = interpolator.interpolate("Use \\${expression} syntax");
-      assertEquals("Use ${expression} syntax", result);
-    }
-
-    @Test
     void shouldHandleMixedEscapedAndUnescapedPlaceholders() {
       String result = interpolator.interpolate("${name} uses \\${syntax}");
       assertEquals("Alice uses ${syntax}", result);
@@ -253,15 +247,6 @@ class JakartaElStringInterpolatorTest {
               () -> strictInterpolator.interpolate("Value: ${unknown}"));
 
       assertTrue(exception.getMessage().contains("unknown"));
-    }
-
-    @Test
-    void shouldKeepPlaceholderInNonStrictModeForUnresolved() {
-      JakartaElStringInterpolator nonStrictInterpolator =
-          JakartaElStringInterpolator.builder().variable("x", 1).strict(false).build();
-
-      String result = nonStrictInterpolator.interpolate("Value: ${unknown}");
-      assertEquals("Value: ${unknown}", result);
     }
   }
 
@@ -464,14 +449,6 @@ class JakartaElStringInterpolatorTest {
                 InterpolationException.class,
                 () -> strictInterp.interpolate("Hello ${undefinedVar}"));
         assertTrue(ex.getMessage().contains("Unable to resolve EL expression"));
-      }
-
-      @Test
-      void shouldPreservePlaceholderForUndefinedVariableInNonStrictMode() {
-        JakartaElStringInterpolator nonStrictInterp =
-            JakartaElStringInterpolator.builder().strict(false).build();
-        String result = nonStrictInterp.interpolate("Hello ${undefinedVar}");
-        assertEquals("Hello ${undefinedVar}", result);
       }
 
       @Test

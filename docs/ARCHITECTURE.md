@@ -49,6 +49,10 @@ The Workflow Engine is designed as a flexible, extensible orchestration framewor
 │  │  Branching   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │    Repeat    │  │   ForEach    │  │      Chaos           │  │
+│  │   Workflow   │  │   Workflow   │  │     Workflow         │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │     Task     │  │ Rate Limited │  │     Timeout          │  │
 │  │   Workflow   │  │   Workflow   │  │     Workflow         │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
@@ -172,11 +176,15 @@ else:
                │         ├── ParallelWorkflow
                │         ├── ConditionalWorkflow
                │         ├── DynamicBranchingWorkflow
+               │         ├── RepeatWorkflow
+               │         ├── ForEachWorkflow
                │         ├── FallbackWorkflow
                │         ├── SagaWorkflow
                │         ├── TaskWorkflow
                │         ├── RateLimitedWorkflow
-               │         └── TimeoutWorkflow
+               │         ├── TimeoutWorkflow
+               │         ├── JavascriptWorkflow
+               │         └── ChaosWorkflow
                │
                └── Custom Implementations
 ```
@@ -215,7 +223,10 @@ else:
                │         ├── Processing & Scripting
                │         │         └── ShellCommandTask
                │         │
-               │         └── Utility
+               │         ├── Logging & Monitoring
+               │         │         └── LogTask
+               │         │
+               │         └── Utility & Timing
                │                   ├── NoOpTask
                │                   └── DelayTask
                │
@@ -244,15 +255,19 @@ else:
    - `JdbcStreamingQueryTask` - Memory-efficient streaming for large result sets
    - `JdbcUpdateTask` - Execute INSERT/UPDATE/DELETE statements
    - `JdbcBatchUpdateTask` - Batch operations for performance
-   - `JdbcCallableTask` - Call stored procedures with - OUT parameters
+   - `JdbcCallableTask` - Call stored procedures with OUT parameters
    - `JdbcTransactionTask` - Execute multiple tasks in a single transaction
 
 4. **Processing Tasks** - Code execution and transformation
    - `ShellCommandTask` - Execute shell commands and capture output
 
-5. **Utility Tasks** - Supporting functionality
+5. **Logging & Monitoring Tasks** - Logging and observability
+   - `LogTask` - Log messages at configurable SLF4J levels (TRACE, DEBUG, INFO, WARN, ERROR)
+
+6. **Utility & Timing Tasks** - Supporting functionality
    - `NoOpTask` - Placeholder task with no operation (null-object pattern)
    - `DelayTask` - Introduce deliberate delays (rate limiting, pacing)
+
 
 ### 3. Context Management
 

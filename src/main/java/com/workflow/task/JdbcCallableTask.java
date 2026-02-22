@@ -249,49 +249,61 @@ public class JdbcCallableTask extends AbstractTask {
     // Determine OUT parameters source (direct or from context)
     Map<Integer, Integer> effectiveOutParams = getOutParameters(context);
 
-    try (Connection conn = dataSource.getConnection();
-        CallableStatement stmt = conn.prepareCall(effectiveCall)) {
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = getConnection(context);
 
-      // Bind IN parameters
-      for (Map.Entry<Integer, Object> entry : effectiveInParams.entrySet()) {
-        stmt.setObject(entry.getKey(), entry.getValue());
-      }
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
 
-      // Register OUT parameters
-      for (Map.Entry<Integer, Integer> entry : effectiveOutParams.entrySet()) {
-        stmt.registerOutParameter(entry.getKey(), entry.getValue());
-      }
-
-      // Execute
-      boolean hasResultSet = stmt.execute();
-
-      // Get OUT parameter values
-      if (!effectiveOutParams.isEmpty() && outValuesKey != null) {
-        Map<Integer, Object> outValues = new HashMap<>();
-        for (Integer position : effectiveOutParams.keySet()) {
-          Object value = stmt.getObject(position);
-          outValues.put(position, value);
+      try (CallableStatement stmt = conn.prepareCall(effectiveCall)) {
+        // Bind IN parameters
+        for (Map.Entry<Integer, Object> entry : effectiveInParams.entrySet()) {
+          stmt.setObject(entry.getKey(), entry.getValue());
         }
-        context.put(outValuesKey, outValues);
-      }
 
-      // Process result sets
-      List<List<Map<String, Object>>> allResultSets = new ArrayList<>();
-      while (hasResultSet) {
-        try (ResultSet rs = stmt.getResultSet()) {
-          List<Map<String, Object>> resultSet = convertResultSetToList(rs);
-          allResultSets.add(resultSet);
+        // Register OUT parameters
+        for (Map.Entry<Integer, Integer> entry : effectiveOutParams.entrySet()) {
+          stmt.registerOutParameter(entry.getKey(), entry.getValue());
         }
-        hasResultSet = stmt.getMoreResults();
-      }
 
-      if (!allResultSets.isEmpty() && resultSetKey != null) {
-        context.put(resultSetKey, allResultSets);
+        // Execute
+        boolean hasResultSet = stmt.execute();
+
+        // Get OUT parameter values
+        if (!effectiveOutParams.isEmpty() && outValuesKey != null) {
+          Map<Integer, Object> outValues = new HashMap<>();
+          for (Integer position : effectiveOutParams.keySet()) {
+            Object value = stmt.getObject(position);
+            outValues.put(position, value);
+          }
+          context.put(outValuesKey, outValues);
+        }
+
+        // Process result sets
+        List<List<Map<String, Object>>> allResultSets = new ArrayList<>();
+        while (hasResultSet) {
+          try (ResultSet rs = stmt.getResultSet()) {
+            List<Map<String, Object>> resultSet = convertResultSetToList(rs);
+            allResultSets.add(resultSet);
+          }
+          hasResultSet = stmt.getMoreResults();
+        }
+
+        if (!allResultSets.isEmpty() && resultSetKey != null) {
+          context.put(resultSetKey, allResultSets);
+        }
       }
 
     } catch (SQLException e) {
       throw new TaskExecutionException(
           "Failed to execute callable statement: " + e.getMessage(), e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

@@ -278,22 +278,34 @@ public class JdbcTypedQueryTask<T> extends AbstractTask {
     // Determine row mapper source
     RowMapper<T> effectiveMapper = getRowMapper(context);
 
-    List<T> results = new ArrayList<>();
-    try (Connection conn = dataSource.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+    // 1. Check if a transaction connection exists in the context
+    Connection sharedConn = (Connection) context.get(JdbcTransactionTask.CONNECTION_CONTEXT_KEY);
 
-      // Bind parameters
-      for (int i = 0; i < effectiveParams.size(); i++) {
-        stmt.setObject(i + 1, effectiveParams.get(i));
+    // 2. Use the shared connection if available, otherwise get a new one from DataSource
+    boolean isShared = sharedConn != null;
+    Connection conn = null;
+
+    List<T> results = new ArrayList<>();
+    try {
+      conn = isShared ? sharedConn : dataSource.getConnection();
+      if (!isShared) {
+        conn.setReadOnly(true);
       }
 
-      // Execute and map results
-      try (ResultSet rs = stmt.executeQuery()) {
-        int rowNum = 0;
-        while (rs.next()) {
-          T mappedRow = mapRow(effectiveMapper, rs, rowNum);
-          results.add(mappedRow);
-          rowNum++;
+      try (PreparedStatement stmt = conn.prepareStatement(effectiveSql)) {
+        // Bind parameters
+        for (int i = 0; i < effectiveParams.size(); i++) {
+          stmt.setObject(i + 1, effectiveParams.get(i));
+        }
+
+        // Execute and map results
+        try (ResultSet rs = stmt.executeQuery()) {
+          int rowNum = 0;
+          while (rs.next()) {
+            T mappedRow = mapRow(effectiveMapper, rs, rowNum);
+            results.add(mappedRow);
+            rowNum++;
+          }
         }
       }
 
@@ -302,6 +314,10 @@ public class JdbcTypedQueryTask<T> extends AbstractTask {
 
     } catch (SQLException e) {
       throw new TaskExecutionException("Typed query execution failed: " + e.getMessage(), e);
+    } finally {
+      if (!isShared) {
+        close(conn);
+      }
     }
   }
 

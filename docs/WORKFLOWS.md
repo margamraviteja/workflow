@@ -7,12 +7,15 @@
 - [Parallel Workflow](#parallel-workflow)
 - [Conditional Workflow](#conditional-workflow)
 - [Dynamic Branching Workflow](#dynamic-branching-workflow)
+- [Repeat Workflow](#repeat-workflow)
+- [ForEach Workflow](#foreach-workflow)
 - [Fallback Workflow](#fallback-workflow)
 - [Saga Workflow](#saga-workflow)
 - [Task Workflow](#task-workflow)
 - [Rate Limited Workflow](#rate-limited-workflow)
 - [Timeout Workflow](#timeout-workflow)
 - [JavaScript Workflow](#javascript-workflow)
+- [Chaos Workflow](#chaos-workflow)
 - [Workflow Composition](#workflow-composition)
 - [Best Practices](#best-practices)
 
@@ -46,7 +49,7 @@ public class WorkflowResult {
 
 ## Workflow Types
 
-The framework provides eleven core workflow types:
+The framework provides thirteen core workflow types:
 
 | Workflow              | Purpose              | Execution           | Use Case                  |
 |-----------------------|----------------------|---------------------|---------------------------|
@@ -54,6 +57,8 @@ The framework provides eleven core workflow types:
 | **Parallel**          | Concurrent execution | All at once         | Data aggregation, fan-out |
 | **Conditional**       | Binary branching     | Based on predicate  | If-then-else logic        |
 | **Dynamic Branching** | Multi-way branching  | Based on selector   | Switch/case logic         |
+| **Repeat**            | Fixed iterations     | N times             | Retry loops, polling      |
+| **ForEach**           | Collection iteration | Per item            | Batch processing          |
 | **Fallback**          | Primary/secondary    | Fallback on failure | Error recovery            |
 | **Saga**              | Distributed txn      | With compensations  | Rollback on failure       |
 | **Task**              | Single task wrapper  | Task execution      | Wrap tasks as workflows   |
@@ -656,6 +661,294 @@ public void example() {
 }
 ```
 
+## Repeat Workflow
+
+Executes a child workflow a fixed number of times with optional index tracking.
+
+### Features
+
+- **Fixed Iterations**: Executes exactly N times
+- **Index Binding**: Optional iteration index variable
+- **Fail-Fast**: Stops on first failure
+- **Sequential Execution**: Iterations run in order
+- **Zero Handling**: Returns SUCCESS immediately if times ≤ 0
+
+### Builder API
+
+```
+RepeatWorkflow.builder()
+    .name(String)                          // Optional name
+    .times(int)                            // Number of iterations
+    .indexVariable(String)                 // Optional index variable (default: "iteration")
+    .workflow(Workflow)                    // Workflow to repeat
+    .build()
+```
+
+### Basic Example
+
+```java
+Workflow retryLoop = RepeatWorkflow.builder()
+    .name("RetryLoop")
+    .times(3)
+    .indexVariable("attempt")
+    .workflow(unreliableTask)
+    .build();
+
+WorkflowContext context = new WorkflowContext();
+WorkflowResult result = retryLoop.execute(context);
+
+// Access attempt number
+Integer lastAttempt = context.getTyped("attempt", Integer.class);
+```
+
+### Real-World Examples
+
+#### Polling Pattern
+
+```java
+Workflow pollingWorkflow = RepeatWorkflow.builder()
+    .name("PollForCompletion")
+    .times(10)
+    .indexVariable("pollAttempt")
+    .workflow(SequentialWorkflow.builder()
+        .task(ctx -> {
+            // Check if job is complete
+            String jobId = ctx.getTyped("jobId", String.class);
+            JobStatus status = jobService.getStatus(jobId);
+            ctx.put("jobStatus", status);
+        })
+        .task(ctx -> {
+            JobStatus status = ctx.getTyped("jobStatus", JobStatus.class);
+            if (status == JobStatus.COMPLETED) {
+                // Force early exit by throwing exception
+                throw new TaskExecutionException("Job completed");
+            }
+        })
+        .build())
+    .build();
+```
+
+#### Health Check Retries
+
+```java
+Workflow healthCheckWithRetry = RepeatWorkflow.builder()
+    .name("HealthCheckRetry")
+    .times(3)
+    .indexVariable("retryCount")
+    .workflow(new TaskWorkflow(new HealthCheckTask()))
+    .build();
+```
+
+#### Scheduled Cleanup
+
+```java
+Workflow scheduledCleanup = RepeatWorkflow.builder()
+    .name("CleanupTask")
+    .times(5)
+    .indexVariable("cleanupRound")
+    .workflow(SequentialWorkflow.builder()
+        .task(new DelayTask(Duration.ofSeconds(1)))
+        .task(new CleanupTask())
+        .build())
+    .build();
+```
+
+### Best Practices
+
+1. **Consider Timeout**: Use `TimeoutWorkflow` wrapper for long-running repeats
+2. **Track Attempts**: Use index variable to log retry progress
+3. **Fail Fast**: Use `ConditionalWorkflow` to exit early if condition is met
+4. **Exponential Backoff**: Use `RetryPolicy` on individual tasks instead of repeating
+
+```java
+// Better approach: Use task-level retry policy
+TaskDescriptor retryableTask = TaskDescriptor.builder()
+    .task(unreliableTask)
+    .retryPolicy(RetryPolicy.exponentialBackoff(3, 100))
+    .build();
+
+Workflow workflow = new TaskWorkflow(retryableTask);
+```
+
+## ForEach Workflow
+
+Iterates over a collection and executes a child workflow for each item.
+
+### Features
+
+- **Collection Support**: List, Set, Array, and any Collection type
+- **Item Binding**: Current item available in context
+- **Index Tracking**: Optional iteration index
+- **Null/Empty Safe**: Handles null and empty collections gracefully
+- **Fail-Fast**: Stops on first failure
+
+### Builder API
+
+```
+ForEachWorkflow.builder()
+    .name(String)                          // Optional name
+    .itemsKey(String)                      // Context key containing collection
+    .itemVariable(String)                  // Context key for current item
+    .indexVariable(String)                 // Optional context key for index
+    .workflow(Workflow)                    // Workflow to execute per item
+    .build()
+```
+
+### Basic Example
+
+```java
+Workflow processUsers = ForEachWorkflow.builder()
+    .name("ProcessAllUsers")
+    .itemsKey("userList")
+    .itemVariable("currentUser")
+    .indexVariable("userIndex")
+    .workflow(new TaskWorkflow(new ProcessUserTask()))
+    .build();
+
+WorkflowContext context = new WorkflowContext();
+context.put("userList", List.of(user1, user2, user3));
+WorkflowResult result = processUsers.execute(context);
+
+// Access last processed user and index
+User lastUser = context.getTyped("currentUser", User.class);
+Integer lastIndex = context.getTyped("userIndex", Integer.class);
+```
+
+### Real-World Examples
+
+#### Batch File Processing
+
+```java
+Workflow processFiles = ForEachWorkflow.builder()
+    .name("ProcessUploadedFiles")
+    .itemsKey("fileList")
+    .itemVariable("currentFile")
+    .indexVariable("fileIndex")
+    .workflow(SequentialWorkflow.builder()
+        .task(ctx -> {
+            File file = ctx.getTyped("currentFile", File.class);
+            Integer index = ctx.getTyped("fileIndex", Integer.class);
+            System.out.println("Processing file " + index + ": " + file.getName());
+        })
+        .workflow(new TaskWorkflow(new FileProcessingTask()))
+        .build())
+    .build();
+
+List<File> files = Files.list(Path.of("/uploads"))
+    .map(Path::toFile)
+    .collect(Collectors.toList());
+
+WorkflowContext context = new WorkflowContext();
+context.put("fileList", files);
+processFiles.execute(context);
+```
+
+#### Order Item Processing
+
+```java
+Workflow processOrderItems = ForEachWorkflow.builder()
+    .name("ProcessOrderItems")
+    .itemsKey("items")
+    .itemVariable("item")
+    .workflow(SequentialWorkflow.builder()
+        .task(ctx -> {
+            OrderItem item = ctx.getTyped("item", OrderItem.class);
+            // Reserve inventory
+            inventoryService.reserve(item.getProductId(), item.getQuantity());
+        })
+        .task(ctx -> {
+            OrderItem item = ctx.getTyped("item", OrderItem.class);
+            // Update pricing
+            double finalPrice = pricingService.calculate(item);
+            item.setFinalPrice(finalPrice);
+        })
+        .build())
+    .build();
+
+Order order = new Order();
+order.setItems(Arrays.asList(item1, item2, item3));
+
+WorkflowContext context = new WorkflowContext();
+context.put("items", order.getItems());
+processOrderItems.execute(context);
+```
+
+#### Parallel Batch Processing with ForEach
+
+```java
+Workflow parallelBatchProcessing = ForEachWorkflow.builder()
+    .name("ProcessDataBatches")
+    .itemsKey("batches")
+    .itemVariable("batch")
+    .workflow(ParallelWorkflow.builder()
+        .name("ProcessBatchInParallel")
+        .workflow(new TaskWorkflow(new ValidateTask()))
+        .workflow(new TaskWorkflow(new TransformTask()))
+        .workflow(new TaskWorkflow(new LoadTask()))
+        .build())
+    .build();
+
+// Combine ForEach with Parallel for efficient processing
+List<DataBatch> batches = data.stream()
+    .collect(Collectors.groupingBy(d -> d.hashCode() % 4))
+    .values()
+    .stream()
+    .map(DataBatch::new)
+    .collect(Collectors.toList());
+
+WorkflowContext context = new WorkflowContext();
+context.put("batches", batches);
+parallelBatchProcessing.execute(context);
+```
+
+#### Email Notification Campaign
+
+```java
+Workflow emailCampaign = ForEachWorkflow.builder()
+    .name("SendCampaignEmails")
+    .itemsKey("recipients")
+    .itemVariable("recipient")
+    .indexVariable("emailIndex")
+    .workflow(SequentialWorkflow.builder()
+        .task(ctx -> {
+            User recipient = ctx.getTyped("recipient", User.class);
+            Integer index = ctx.getTyped("emailIndex", Integer.class);
+            
+            Email email = new Email();
+            email.setTo(recipient.getEmail());
+            email.setSubject("Campaign Message " + index);
+            ctx.put("email", email);
+        })
+        .workflow(RateLimitedWorkflow.builder()
+            .workflow(new TaskWorkflow(new SendEmailTask()))
+            .rateLimitStrategy(new FixedWindowRateLimiter(100, Duration.ofMinutes(1)))
+            .build())
+        .build())
+    .build();
+```
+
+### Best Practices
+
+1. **Large Collections**: For very large collections (millions of items), consider pagination
+2. **Error Handling**: Wrap in `FallbackWorkflow` for collection retrieval fallback
+3. **Parallel Processing**: Combine with `ParallelWorkflow` for CPU-intensive per-item work
+4. **Rate Limiting**: Use `RateLimitedWorkflow` inside ForEach for API calls
+5. **Type Safety**: Use `TypedKey` for context variables
+
+```java
+// Using TypedKey for type safety
+private static final TypedKey<List<Order>> ORDERS = TypedKey.of("orders", List.class);
+private static final TypedKey<Order> CURRENT_ORDER = TypedKey.of("order", Order.class);
+
+public void example() {
+    ForEachWorkflow.builder()
+        .itemsKey(ORDERS.getKey())
+        .itemVariable(CURRENT_ORDER.getKey())
+        .workflow(processOrderWorkflow)
+        .build();
+}
+```
+
 ## Fallback Workflow
 
 Executes primary workflow, falls back to secondary on failure.
@@ -663,6 +956,8 @@ Executes primary workflow, falls back to secondary on failure.
 ### Features
 
 - **Primary/Secondary**: Try primary first, fallback on failure
+
+
 - **Error Recovery**: Graceful degradation
 - **Transparent**: Client doesn't know which workflow executed
 

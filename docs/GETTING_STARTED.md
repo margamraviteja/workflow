@@ -357,6 +357,92 @@ public class SagaExample {
 }
 ```
 
+### Pattern 7: Repeat Workflow
+
+Execute a workflow a fixed number of times with iteration tracking:
+
+```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import com.workflow.task.DelayTask;
+import java.time.Duration;
+
+public class RepeatWorkflowExample {
+    public WorkflowResult retryWithPolling() {
+        Workflow pollWorkflow = RepeatWorkflow.builder()
+                .name("PollForCompletion")
+                .times(10)
+                .indexVariable("attempt")
+                .workflow(SequentialWorkflow.builder()
+                        .task(new DelayTask(Duration.ofSeconds(1)))
+                        .task(ctx -> {
+                            String jobId = ctx.getTyped("jobId", String.class);
+                            JobStatus status = jobService.getStatus(jobId);
+                            ctx.put("status", status);
+                            System.out.println("Attempt " + ctx.get("attempt") + ": " + status);
+                        })
+                        .build())
+                .build();
+
+        WorkflowContext context = new WorkflowContext();
+        context.put("jobId", "job-123");
+        return pollWorkflow.execute(context);
+    }
+}
+```
+
+### Pattern 8: ForEach Workflow
+
+Iterate over a collection and execute workflow for each item:
+
+```java
+import com.workflow.*;
+import com.workflow.context.WorkflowContext;
+import java.util.List;
+
+public class ForEachWorkflowExample {
+    public WorkflowResult processBatch(List<User> users) {
+        Workflow batchProcessor = ForEachWorkflow.builder()
+                .name("ProcessAllUsers")
+                .itemsKey("userList")
+                .itemVariable("currentUser")
+                .indexVariable("userIndex")
+                .workflow(SequentialWorkflow.builder()
+                        .task(ctx -> {
+                            User user = ctx.getTyped("currentUser", User.class);
+                            Integer index = ctx.getTyped("userIndex", Integer.class);
+                            System.out.println("Processing user " + index + ": " + user.getName());
+                        })
+                        .task(new ProcessUserTask())
+                        .build())
+                .build();
+
+        WorkflowContext context = new WorkflowContext();
+        context.put("userList", users);
+        return batchProcessor.execute(context);
+    }
+    
+    public WorkflowResult processFilesWithParallel(List<File> files) {
+        // Combine ForEach with Parallel for efficient batch processing
+        Workflow parallelBatchProcessor = ForEachWorkflow.builder()
+                .name("ProcessFileBatches")
+                .itemsKey("fileBatches")
+                .itemVariable("currentBatch")
+                .workflow(ParallelWorkflow.builder()
+                        .name("ProcessBatchItems")
+                        .task(new ValidateFileTask())
+                        .task(new TransformFileTask())
+                        .task(new UploadFileTask())
+                        .build())
+                .build();
+
+        WorkflowContext context = new WorkflowContext();
+        context.put("fileBatches", files);
+        return parallelBatchProcessor.execute(context);
+    }
+}
+```
+
 ## Configuration Options
 
 ### Context Management

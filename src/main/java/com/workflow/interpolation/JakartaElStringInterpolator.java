@@ -13,25 +13,25 @@ import lombok.Getter;
  * A {@link StringInterpolator} implementation that uses Jakarta Expression Language (Jakarta EL)
  * for expression evaluation.
  *
- * <p>This interpolator supports the standard EL syntax with {@code #{expression}} placeholders and
+ * <p>This interpolator supports the standard EL syntax with {@code ${expression}} placeholders and
  * provides powerful expression evaluation capabilities including:
  *
  * <ul>
- *   <li>Property access: {@code #{user.name}}, {@code #{order.items[0].price}}
- *   <li>Method calls: {@code #{user.getName()}}, {@code #{list.size()}}
- *   <li>Arithmetic operations: {@code #{price * quantity}}, {@code #{total + tax}}
- *   <li>Comparisons: {@code #{age >= 18}}, {@code #{status == 'active'}}
- *   <li>Logical operations: {@code #{a && b}}, {@code #{!empty list}}
- *   <li>Conditional expressions: {@code #{age >= 18 ? 'adult' : 'minor'}}
- *   <li>String concatenation: {@code #{firstName += ' ' += lastName}}
- *   <li>Collection operations: {@code #{items.stream().filter(i -> i.active).toList()}}
+ *   <li>Property access: {@code ${user.name}}, {@code ${order.items[0].price}}
+ *   <li>Method calls: {@code ${user.getName()}}, {@code ${list.size()}}
+ *   <li>Arithmetic operations: {@code ${price * quantity}}, {@code ${total + tax}}
+ *   <li>Comparisons: {@code ${age >= 18}}, {@code ${status == 'active'}}
+ *   <li>Logical operations: {@code ${a && b}}, {@code ${!empty list}}
+ *   <li>Conditional expressions: {@code ${age >= 18 ? 'adult' : 'minor'}}
+ *   <li>String concatenation: {@code ${firstName += ' ' += lastName}}
+ *   <li>Collection operations: {@code ${items.stream().filter(i -> i.active).toList()}}
  * </ul>
  *
  * <p><b>Placeholder Syntax:</b>
  *
  * <ul>
- *   <li>{@code #{expression}} - EL expression placeholder
- *   <li>{@code \#{literal}} - Escaped placeholder (becomes literal {@code #{literal}})
+ *   <li>{@code ${expression}} - EL expression placeholder
+ *   <li>{@code \${literal}} - Escaped placeholder (becomes literal {@code ${literal}})
  * </ul>
  *
  * <p><b>Example Usage:</b>
@@ -45,13 +45,13 @@ import lombok.Getter;
  * JakartaElStringInterpolator interpolator = JakartaElStringInterpolator.forVariables(variables);
  *
  * // Property access
- * interpolator.interpolate("Hello, #{user.name}!"); // "Hello, Alice!"
+ * interpolator.interpolate("Hello, ${user.name}!"); // "Hello, Alice!"
  *
  * // Conditional expression
- * interpolator.interpolate("Status: #{user.age >= 18 ? 'adult' : 'minor'}"); // "Status: adult"
+ * interpolator.interpolate("Status: ${user.age >= 18 ? 'adult' : 'minor'}"); // "Status: adult"
  *
  * // Collection access
- * interpolator.interpolate("First item: #{items[0]}"); // "First item: apple"
+ * interpolator.interpolate("First item: ${items[0]}"); // "First item: apple"
  * }</pre>
  *
  * @see StringInterpolator
@@ -88,6 +88,10 @@ public class JakartaElStringInterpolator implements StringInterpolator {
       return input;
     }
 
+    if (!containsPlaceholders(input)) {
+      return input;
+    }
+
     ELContext elContext = createELContext();
     try {
       return evaluateExpression(input, elContext);
@@ -120,6 +124,11 @@ public class JakartaElStringInterpolator implements StringInterpolator {
     // Add a custom resolver for WorkflowContext if present
     if (workflowContext != null) {
       context.addELResolver(new WorkflowContextELResolver(workflowContext));
+    }
+
+    // Add a fallback resolver to return empty string for unresolved properties
+    if (!strictByDefault) {
+      context.addELResolver(new FallbackLiteralResolver());
     }
 
     return context;
@@ -303,12 +312,58 @@ public class JakartaElStringInterpolator implements StringInterpolator {
 
     @Override
     public Class<?> getType(ELContext context, Object base, Object property) {
+      if (base == null && property instanceof String) {
+        context.setPropertyResolved(true);
+        return String.class;
+      }
       return null;
     }
 
     @Override
     public void setValue(ELContext context, Object base, Object property, Object value) {
       throw new PropertyNotWritableException("WorkflowContext is read-only");
+    }
+
+    @Override
+    public boolean isReadOnly(ELContext context, Object base, Object property) {
+      return true;
+    }
+
+    @Override
+    public Class<?> getCommonPropertyType(ELContext context, Object base) {
+      return String.class;
+    }
+  }
+
+  /**
+   * Fallback ELResolver that returns an empty string for any unresolved property.
+   *
+   * <p>This resolver is used to avoid exceptions for missing properties when strict mode is
+   * disabled.
+   */
+  static class FallbackLiteralResolver extends ELResolver {
+    @Override
+    public Object getValue(ELContext context, Object base, Object property) {
+      if (base == null && property instanceof String) {
+        // mark resolved so other resolvers are not consulted further
+        context.setPropertyResolved(true);
+        return "";
+      }
+      return null;
+    }
+
+    @Override
+    public Class<?> getType(ELContext context, Object base, Object property) {
+      if (base == null && property instanceof String) {
+        context.setPropertyResolved(true);
+        return String.class;
+      }
+      return null;
+    }
+
+    @Override
+    public void setValue(ELContext context, Object base, Object property, Object value) {
+      throw new PropertyNotWritableException("FallbackLiteralResolver is read-only");
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.workflow.exception.HttpResponseProcessingException;
 import com.workflow.exception.JsonProcessingException;
 import com.workflow.exception.TaskExecutionException;
 import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import lombok.experimental.UtilityClass;
 import tools.jackson.core.JacksonException;
@@ -56,6 +58,41 @@ public final class ResponseMappers {
       if (body == null || body.isBlank()) return null;
       try {
         return JsonUtils.fromJson(body, responseType);
+      } catch (JacksonException e) {
+        throw new JsonProcessingException(
+            "Failed to deserialize response to " + responseType.getName(), e);
+      }
+    };
+  }
+
+  /**
+   * Mapper that wraps the entire HttpResponse into HttpResponseWrapper, including status, headers,
+   * and body.
+   */
+  public static Function<HttpResponse<String>, HttpResponseWrapper<String>>
+      httpResponseWrapperMapper() {
+    return resp -> {
+      Map<String, List<String>> headers = resp.headers().map();
+      return new HttpResponseWrapper<>(resp.statusCode(), headers, resp.body());
+    };
+  }
+
+  /**
+   * Typed mapper that wraps the entire HttpResponse into HttpResponseWrapper, deserializing body
+   * into responseType.
+   */
+  public static <T>
+      Function<HttpResponse<String>, HttpResponseWrapper<T>> httpResponseWrapperMapper(
+          Class<T> responseType) {
+    return resp -> {
+      Map<String, List<String>> headers = resp.headers().map();
+      String body = resp.body();
+      if (body == null || body.isBlank()) {
+        return new HttpResponseWrapper<>(resp.statusCode(), headers, null);
+      }
+      try {
+        return new HttpResponseWrapper<>(
+            resp.statusCode(), headers, JsonUtils.fromJson(body, responseType));
       } catch (JacksonException e) {
         throw new JsonProcessingException(
             "Failed to deserialize response to " + responseType.getName(), e);
